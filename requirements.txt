@@ -1,0 +1,3 @@
+ultralytics
+load_dotenv
+numpy==1.26.4

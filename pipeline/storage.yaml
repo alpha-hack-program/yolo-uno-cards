@@ -1,0 +1,81 @@
+# PIPELINE DEFINITION
+# Name: pipeline
+components:
+  comp-pipeline:
+    executorLabel: exec-pipeline
+deploymentSpec:
+  executors:
+    exec-pipeline:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - pipeline
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'kubernetes==23.6.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef pipeline():\n    # Define the function to list PVCs\n    def\
+          \ list_pvcs(namespace: str):\n        import os\n        from kubernetes\
+          \ import client, config\n\n        # Create configuration using the service\
+          \ account token and namespace\n        configuration = client.Configuration()\n\
+          \n        # Load the service account token and namespace from the mounted\
+          \ paths\n        token_path = '/var/run/secrets/kubernetes.io/serviceaccount/token'\n\
+          \        namespace_path = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'\n\
+          \n        # Read the token\n        with open(token_path, 'r') as token_file:\n\
+          \            token = token_file.read().strip()\n\n        # Read the namespace\n\
+          \        with open(namespace_path, 'r') as namespace_file:\n           \
+          \ namespace = namespace_file.read().strip()\n\n        # Configure the client\n\
+          \        # curl -k --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\
+          \ \\\n        #   -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\"\
+          \  \\\n        #   https://kubernetes.default.svc/api/v1/namespaces/iniciativa-2/persistentvolumeclaims/images-datasets-pvc\n\
+          \        kubernetes_host = f\"https://{os.getenv('KUBERNETES_SERVICE_HOST',\
+          \ 'kubernetes.default.svc')}:{os.getenv('KUBERNETES_SERVICE_PORT', '443')}\"\
+          \n        print(f\"kubernetes_host: {kubernetes_host}\")\n        configuration.host\
+          \ = 'https://kubernetes.default.svc'\n        configuration.verify_ssl =\
+          \ True\n        configuration.ssl_ca_cert = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'\n\
+          \        configuration.api_key['authorization'] = token\n        configuration.api_key_prefix['authorization']\
+          \ = 'Bearer'\n\n        # Print all the configuration settings\n       \
+          \ print(\"Configuration settings:\")\n        for attr, value in vars(configuration).items():\n\
+          \            print(f\"{attr}: {value}\")\n\n        print(\"Configured Kubernetes\
+          \ API Host:\", configuration.host)\n        # Create an API client with\
+          \ the configuration\n        api_client = client.ApiClient(configuration)\n\
+          \        print(\"API Client Host:\", api_client.configuration.host)\n\n\
+          \        # Use the CoreV1 API to list PVCs\n        v1 = client.CoreV1Api(api_client)\n\
+          \        pvc_list = v1.list_namespaced_persistent_volume_claim(namespace)\n\
+          \n        # Print PVC names and statuses\n        for pvc in pvc_list.items:\n\
+          \            print(f\"PVC Name: {pvc.metadata.name}, Status: {pvc.status.phase}\"\
+          )\n\n    # Call the function to list PVCs\n    list_pvcs(\"default\")  #\
+          \ You can replace \"default\" with a variable if needed\n\n"
+        image: python:3.11
+pipelineInfo:
+  name: pipeline
+root:
+  dag:
+    tasks:
+      pipeline:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-pipeline
+        taskInfo:
+          name: pipeline
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0

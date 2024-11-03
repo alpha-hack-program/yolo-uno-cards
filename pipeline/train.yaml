@@ -1,0 +1,809 @@
+# PIPELINE DEFINITION
+# Name: train
+# Inputs:
+#    batch_size: int [Default: 2.0]
+#    enable_caching: bool [Default: False]
+#    epochs: int [Default: 1.0]
+#    experiment_name: str [Default: 'YOLOv8n']
+#    force_clean: bool [Default: False]
+#    image_size: int [Default: 640.0]
+#    images_dataset_name: str [Default: 'uno-cards']
+#    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
+#    images_dataset_root: str [Default: 'datasets']
+#    images_dataset_yaml: str [Default: 'data.yaml']
+#    map75_threshold: float [Default: 0.1]
+#    model_name: str [Default: 'yolov8n']
+#    run_name: str [Default: 'yolo-run']
+#    tracking_uri: str [Default: 'http://mlflow-server:8080']
+# Outputs:
+#    train-model-results_output_metrics: system.Metrics
+components:
+  comp-condition-2:
+    dag:
+      tasks:
+        upload-model:
+          cachingOptions: {}
+          componentRef:
+            name: comp-upload-model
+          inputs:
+            artifacts:
+              input_model:
+                componentInputArtifact: pipelinechannel--train-model-output_model
+          taskInfo:
+            name: upload-model
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--train-model-output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--map75_threshold:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--parse-metrics-map75_output:
+          parameterType: NUMBER_DOUBLE
+  comp-condition-3:
+    dag:
+      tasks:
+        yield-not-deployed-error:
+          cachingOptions: {}
+          componentRef:
+            name: comp-yield-not-deployed-error
+          taskInfo:
+            name: yield-not-deployed-error
+    inputDefinitions:
+      parameters:
+        pipelinechannel--map75_threshold:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--parse-metrics-map75_output:
+          parameterType: NUMBER_DOUBLE
+  comp-condition-branches-1:
+    dag:
+      tasks:
+        condition-2:
+          componentRef:
+            name: comp-condition-2
+          inputs:
+            artifacts:
+              pipelinechannel--train-model-output_model:
+                componentInputArtifact: pipelinechannel--train-model-output_model
+            parameters:
+              pipelinechannel--map75_threshold:
+                componentInputParameter: pipelinechannel--map75_threshold
+              pipelinechannel--parse-metrics-map75_output:
+                componentInputParameter: pipelinechannel--parse-metrics-map75_output
+          taskInfo:
+            name: condition-2
+          triggerPolicy:
+            condition: inputs.parameter_values['pipelinechannel--parse-metrics-map75_output']
+              >= inputs.parameter_values['pipelinechannel--map75_threshold']
+        condition-3:
+          componentRef:
+            name: comp-condition-3
+          inputs:
+            parameters:
+              pipelinechannel--map75_threshold:
+                componentInputParameter: pipelinechannel--map75_threshold
+              pipelinechannel--parse-metrics-map75_output:
+                componentInputParameter: pipelinechannel--parse-metrics-map75_output
+          taskInfo:
+            name: condition-3
+          triggerPolicy:
+            condition: '!(inputs.parameter_values[''pipelinechannel--parse-metrics-map75_output'']
+              >= inputs.parameter_values[''pipelinechannel--map75_threshold''])'
+    inputDefinitions:
+      artifacts:
+        pipelinechannel--train-model-output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        pipelinechannel--map75_threshold:
+          parameterType: NUMBER_DOUBLE
+        pipelinechannel--parse-metrics-map75_output:
+          parameterType: NUMBER_DOUBLE
+  comp-get-images-dataset:
+    executorLabel: exec-get-images-dataset
+    inputDefinitions:
+      parameters:
+        force_clean:
+          parameterType: BOOLEAN
+        images_dataset_name:
+          parameterType: STRING
+        images_dataset_root:
+          parameterType: STRING
+        images_dataset_volume_mount_path:
+          parameterType: STRING
+        images_dataset_yaml:
+          parameterType: STRING
+  comp-parse-metrics:
+    executorLabel: exec-parse-metrics
+    inputDefinitions:
+      artifacts:
+        metrics_input:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      parameters:
+        map75_output:
+          parameterType: NUMBER_DOUBLE
+  comp-setup-storage:
+    executorLabel: exec-setup-storage
+    inputDefinitions:
+      parameters:
+        access_mode:
+          defaultValue: ReadWriteOnce
+          isOptional: true
+          parameterType: STRING
+        pvc_name:
+          description: Name of the PVC to create.
+          parameterType: STRING
+        size_in_gi:
+          description: Size of the PVC in GiB.
+          parameterType: NUMBER_INTEGER
+        storage_class:
+          defaultValue: ''
+          description: Storage class for the PVC. Default is an empty string.
+          isOptional: true
+          parameterType: STRING
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      parameters:
+        batch_size:
+          parameterType: NUMBER_INTEGER
+        epochs:
+          parameterType: NUMBER_INTEGER
+        experiment_name:
+          parameterType: STRING
+        image_size:
+          parameterType: NUMBER_INTEGER
+        images_dataset_name:
+          parameterType: STRING
+        images_dataset_root:
+          parameterType: STRING
+        images_dataset_volume_mount_path:
+          parameterType: STRING
+        images_dataset_yaml:
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        run_name:
+          parameterType: STRING
+        tracking_uri:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        results_output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-upload-model:
+    executorLabel: exec-upload-model
+    inputDefinitions:
+      artifacts:
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-yield-not-deployed-error:
+    executorLabel: exec-yield-not-deployed-error
+deploymentSpec:
+  executors:
+    exec-get-images-dataset:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - get_images_dataset
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'boto3' 'botocore'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef get_images_dataset(\n    images_dataset_root: str, \n    images_dataset_name:\
+          \ str,\n    images_dataset_yaml: str,\n    images_dataset_volume_mount_path:\
+          \ str,\n    force_clean: bool\n):\n    import boto3\n    import botocore\n\
+          \    import os\n    import shutil\n    import re\n\n    aws_access_key_id\
+          \ = os.environ.get('AWS_ACCESS_KEY_ID')\n    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')\n\
+          \    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n    region_name =\
+          \ os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name = os.environ.get('AWS_S3_BUCKET')\n\
+          \n    # Construct and set the IMAGES_DATASET_S3_KEY environment variable\n\
+          \    images_dataset_s3_key = f\"{images_dataset_root}/{images_dataset_name}.zip\"\
+          \n\n    print(f\"images_dataset_s3_key = {images_dataset_s3_key}\")\n\n\
+          \    session = boto3.session.Session(\n        aws_access_key_id=aws_access_key_id,\n\
+          \        aws_secret_access_key=aws_secret_access_key\n    )\n\n    s3_resource\
+          \ = session.resource(\n        's3',\n        config=botocore.client.Config(signature_version='s3v4'),\n\
+          \        endpoint_url=endpoint_url,\n        region_name=region_name\n \
+          \   )\n\n    bucket = s3_resource.Bucket(bucket_name)\n\n    # Create a\
+          \ temporary directory to store the dataset\n    local_tmp_dir = '/tmp/get_images_dataset'\n\
+          \    print(f\">>> local_tmp_dir: {local_tmp_dir}\")\n\n    # Ensure local_tmp_dir\
+          \ exists\n    if not os.path.exists(local_tmp_dir):\n        os.makedirs(local_tmp_dir)\n\
+          \n    # Get the file name from the S3 key\n    file_name = f\"{images_dataset_name}.zip\"\
+          \n    # Download the file\n    local_file_path = f'{local_tmp_dir}/{file_name}'\n\
+          \n    # If file doesn't exist in the bucket raise a ValueError\n    objs\
+          \ = list(bucket.objects.filter(Prefix=images_dataset_s3_key))\n    if not\
+          \ any(obj.key == images_dataset_s3_key for obj in objs):\n        raise\
+          \ ValueError(f\"File {images_dataset_s3_key} does not exist in the bucket\
+          \ {bucket_name}\")\n\n    print(f\"Downloading {images_dataset_s3_key} to\
+          \ {local_file_path}\")\n    bucket.download_file(images_dataset_s3_key,\
+          \ local_file_path)\n    print(f\"Downloaded {images_dataset_s3_key}\")\n\
+          \n    # Ensure mount path exists\n    if not os.path.exists(images_dataset_volume_mount_path):\n\
+          \        os.makedirs(images_dataset_volume_mount_path)\n\n    # List the\
+          \ files in the mount path\n    print(f\"Listing files in {images_dataset_volume_mount_path}\"\
+          )\n    print(os.listdir(images_dataset_volume_mount_path))\n\n    # If we\
+          \ haven't unzipped the file yet or we're forced to, unzip it\n    images_dataset_folder\
+          \ = f\"{images_dataset_volume_mount_path}/{images_dataset_name}\"\n    if\
+          \ not os.path.exists(images_dataset_folder) or force_clean:\n        # Unzip\
+          \ the file into the images dataset volume mount path\n        print(f\"\
+          Unzipping {local_file_path} to {images_dataset_volume_mount_path}\")\n \
+          \       shutil.unpack_archive(f'{local_file_path}', f'{images_dataset_volume_mount_path}')\n\
+          \        print(f\"Unzipped {local_file_path} to {images_dataset_volume_mount_path}\"\
+          )\n\n        # List the files inside images_dataset_folder folder\n    \
+          \    print(f\"Listing files in {images_dataset_folder}\")\n        print(os.listdir(images_dataset_folder))\n\
+          \n    # Locate the YAML file in the dataset folder and replace the path\
+          \ with the actual path\n    images_dataset_yaml_path = os.path.join(images_dataset_folder,\
+          \ images_dataset_yaml)\n    print(f\"images_dataset_yaml_path: {images_dataset_yaml_path}\"\
+          )\n\n    # If the YAML file doesn't exist, raise a ValueError\n    if not\
+          \ os.path.exists(images_dataset_yaml_path):\n        raise ValueError(f\"\
+          Dataset YAML file {images_dataset_yaml} not found in {images_dataset_folder}\"\
+          )\n\n    # Replace regex 'path: .*' with 'path: {images_dataset_folder}'\n\
+          \    with open(images_dataset_yaml_path, 'r') as f:\n        data = f.read()\n\
+          \        data = re.sub(r'path: .*', f'path: {images_dataset_folder}', data)\n\
+          \        # Print the updated YAML file\n        print(f\"Updated YAML file:\
+          \ {data}\")\n        # Write the updated YAML file\n        with open(images_dataset_yaml_path,\
+          \ 'w') as f:\n            f.write(data)\n\n"
+        env:
+        - name: IMAGES_DATASET_S3_KEY
+          value: '{{channel:task=;name=images_dataset_root;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+    exec-parse-metrics:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - parse_metrics
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)):\n\
+          \    print(f\"metrics_input: {dir(metrics_input)}\")\n    map75 = metrics_input.metadata[\"\
+          val/map75\"]\n\n    with open(map75_output, 'w') as f:\n        f.write(str(map75))\n\
+          \n"
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+    exec-setup-storage:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - setup_storage
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'kubernetes==23.6.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef setup_storage(\n    pvc_name: str,\n    size_in_gi: int,\n  \
+          \  access_mode: str = \"ReadWriteOnce\",\n    storage_class: str = \"\"\n\
+          ) -> None:\n    \"\"\"Sets up a PersistentVolumeClaim (PVC) if it does not\
+          \ exist.\n\n    Args:\n        pvc_name (str): Name of the PVC to create.\n\
+          \        size_in_gi (int): Size of the PVC in GiB.\n        storage_class\
+          \ (str): Storage class for the PVC. Default is an empty string.\n\n    Raises:\n\
+          \        ValueError: If `size_in_gi` is less than 0.\n        RuntimeError:\
+          \ If there's any other issue in PVC creation.\n    \"\"\"\n    import os\n\
+          \    from kubernetes import client\n    from kubernetes.client.rest import\
+          \ ApiException\n\n    if size_in_gi < 0:\n        raise ValueError(\"size_in_gi\
+          \ must be a non-negative integer.\")\n\n    print(f\"Creating PVC '{pvc_name}'\
+          \ with size {size_in_gi}Gi, access mode '{access_mode}', and storage class\
+          \ '{storage_class}'.\") \n\n    # Create configuration using the service\
+          \ account token and namespace\n    configuration = client.Configuration()\n\
+          \n    # Load the service account token and namespace from the mounted paths\n\
+          \    token_path = '/var/run/secrets/kubernetes.io/serviceaccount/token'\n\
+          \    namespace_path = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'\n\
+          \n    # Read the token\n    with open(token_path, 'r') as token_file:\n\
+          \        token = token_file.read().strip()\n\n    # Read the namespace\n\
+          \    with open(namespace_path, 'r') as namespace_file:\n        namespace\
+          \ = namespace_file.read().strip()\n\n    print(f\"Token: {token} Namespace:\
+          \ {namespace}\")\n\n    # Configure the client\n    # curl -k --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\
+          \ \\\n    #   -H \"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\"\
+          \  \\\n    #   https://kubernetes.default.svc/api/v1/namespaces/iniciativa-2/persistentvolumeclaims/images-datasets-pvc\n\
+          \    kubernetes_host = f\"https://{os.getenv('KUBERNETES_SERVICE_HOST',\
+          \ 'kubernetes.default.svc')}:{os.getenv('KUBERNETES_SERVICE_PORT', '443')}\"\
+          \n    print(f\"kubernetes_host: {kubernetes_host}\")\n    configuration.host\
+          \ = kubernetes_host\n    # configuration.host = 'https://kubernetes.default.svc'\n\
+          \    configuration.verify_ssl = True\n    configuration.ssl_ca_cert = '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'\n\
+          \    configuration.api_key['authorization'] = token\n    configuration.api_key_prefix['authorization']\
+          \ = 'Bearer'\n\n    # Print all the configuration settings\n    print(\"\
+          Configuration settings:\")\n    for attr, value in vars(configuration).items():\n\
+          \        print(f\"{attr}: {value}\")\n\n    print(\"Configured Kubernetes\
+          \ API Host:\", configuration.host)\n    # Create an API client with the\
+          \ configuration\n    api_client = client.ApiClient(configuration)\n    print(\"\
+          API Client Host:\", api_client.configuration.host)\n\n    # Use the CoreV1\
+          \ API to list PVCs\n    v1 = client.CoreV1Api(api_client)\n\n    # Check\
+          \ if the PVC already exists\n    try:\n        v1.read_namespaced_persistent_volume_claim(name=pvc_name,\
+          \ namespace=namespace)\n        print(f\"PVC '{pvc_name}' already exists.\"\
+          )\n        return\n    except ApiException as e:\n        if e.status !=\
+          \ 404:\n            raise RuntimeError(f\"Error checking for existing PVC:\
+          \ {e}\")\n\n    # Define PVC spec\n    pvc_spec = client.V1PersistentVolumeClaim(\n\
+          \        metadata=client.V1ObjectMeta(name=pvc_name),\n        spec=client.V1PersistentVolumeClaimSpec(\n\
+          \            access_modes=[access_mode],\n            resources=client.V1ResourceRequirements(\n\
+          \                requests={\"storage\": f\"{size_in_gi}Gi\"}\n         \
+          \   )\n        )\n    )\n\n    # Add storage class if provided\n    if storage_class:\n\
+          \        pvc_spec.spec.storage_class_name = storage_class\n\n    # Attempt\
+          \ to create the PVC\n    try:\n        v1.create_namespaced_persistent_volume_claim(namespace=\"\
+          default\", body=pvc_spec)\n        print(f\"PVC '{pvc_name}' created successfully.\"\
+          )\n    except ApiException as e:\n        raise RuntimeError(f\"Failed to\
+          \ create PVC: {e.reason}\")\n\n"
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'ultralytics==8.3.22'\
+          \ 'load_dotenv==0.1.0' 'numpy==1.26.4' 'mlflow==2.17.1' 'onnxruntime==1.19.2'\
+          \ 'onnxslim==0.1.36' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(\n    model_name: str, \n    image_size: int, \n\
+          \    batch_size: int, \n    epochs: int, \n    experiment_name: str,\n \
+          \   run_name: str,\n    tracking_uri: str,\n    images_dataset_name: str,\n\
+          \    images_dataset_root: str,\n    images_dataset_yaml: str,\n    images_dataset_volume_mount_path:\
+          \ str,\n    output_model: Output[Model],\n    results_output_metrics: Output[Metrics]\n\
+          ):\n    import os\n    import shutil\n    import time\n\n    import torch\n\
+          \    from ultralytics import YOLO, settings\n    import mlflow\n\n    import\
+          \ numpy as np\n\n    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n\
+          \    region_name = os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name\
+          \ = os.environ.get('AWS_S3_BUCKET')\n    images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')\n\
+          \n    print(f\"tracking_uri {tracking_uri}\")\n    images_dataset_folder\
+          \ = os.path.join(images_dataset_volume_mount_path, images_dataset_name)\n\
+          \n    images_dataset_yaml_path = os.path.join(images_dataset_folder, images_dataset_yaml)\n\
+          \    print(f\"Checking if {images_dataset_yaml_path} exists\")\n    if not\
+          \ os.path.exists(images_dataset_yaml_path):\n        raise ValueError(f\"\
+          Dataset YAML file {images_dataset_yaml} not found in {images_dataset_folder}\"\
+          )\n    print(f\"Dataset YAML file found in {images_dataset_yaml_path}\"\
+          )\n\n    # Set the MLflow tracking URI and experiment\n    os.environ[\"\
+          MLFLOW_TRACKING_URI\"] = tracking_uri\n    os.environ[\"MLFLOW_EXPERIMENT_NAME\"\
+          ] = experiment_name\n\n    # Update a setting\n    settings.update({\"mlflow\"\
+          : True})\n\n    # Set device\n    device = \"cpu\"\n    if torch.cuda.is_available():\n\
+          \        device = \"cuda\"\n        print(f\"Using device: {torch.cuda.get_device_name(0)}\"\
+          )\n    elif torch.backends.mps.is_available():\n        device = \"mps\"\
+          \n        print(\"Using device: MPS\")\n    print(f\"Using device: {device}\"\
+          )\n\n    # Set the run name\n    run_name = f\"{run_name}-{model_name}-{int(time.time())}\"\
+          \n    print(f\"Current run name: {run_name}\")\n\n    # Reset settings to\
+          \ default values\n    settings.reset()\n\n    # Load the model\n    model\
+          \ = YOLO(f'{model_name}.pt')\n\n    # Start the MLflow run\n    with mlflow.start_run(run_name=run_name):\n\
+          \        mlflow.log_param(\"dataset_file\", f\"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}\"\
+          )\n        mlflow.log_param(\"dataset_name\", images_dataset_name)\n   \
+          \     mlflow.log_param(\"dataset_root\", images_dataset_root)\n        mlflow.log_param(\"\
+          dataset_yaml\", images_dataset_yaml)\n        mlflow.log_param(\"device\"\
+          , device)\n        mlflow.log_param(\"batch_size\", batch_size)\n      \
+          \  mlflow.log_param(\"imgsz\", image_size)\n\n        print(f\"Training\
+          \ model {model_name} with dataset {images_dataset_yaml_path}.\")\n     \
+          \   results = model.train(\n            data=images_dataset_yaml_path, \n\
+          \            epochs=epochs, \n            imgsz=image_size, \n         \
+          \   batch=batch_size, \n            device=device\n        )\n\n       \
+          \ if hasattr(results, 'box'):\n            mlflow.log_metric(\"training/map\"\
+          , results.box.map)\n            mlflow.log_metric(\"training/map50\", results.box.map50)\n\
+          \            mlflow.log_metric(\"training/map75\", results.box.map75)\n\
+          \            mlflow.log_metric(\"training/mp\", results.box.mp)\n      \
+          \      mlflow.log_metric(\"training/mr\", results.box.mr)\n            mlflow.log_metric(\"\
+          training/nc\", results.box.nc)\n            results_output_metrics.log_metric(\"\
+          training/map\", results.box.map)\n            results_output_metrics.log_metric(\"\
+          training/map50\", results.box.map50)\n            results_output_metrics.log_metric(\"\
+          training/map75\", results.box.map75)\n            results_output_metrics.log_metric(\"\
+          training/mp\", results.box.mp)\n            results_output_metrics.log_metric(\"\
+          training/mr\", results.box.mr)\n            results_output_metrics.log_metric(\"\
+          training/nc\", results.box.nc)\n\n\n        # Validate the model\n     \
+          \   validation_results = model.val()\n        # print(\"Validation results:\
+          \ \")\n        # print(vars(validation_results))\n\n        if hasattr(validation_results,\
+          \ 'box'):\n            mlflow.log_metric(\"val/map\", validation_results.box.map)\n\
+          \            mlflow.log_metric(\"val/map50\", validation_results.box.map50)\n\
+          \            mlflow.log_metric(\"val/map75\", validation_results.box.map75)\n\
+          \            mlflow.log_metric(\"val/mp\", validation_results.box.mp)\n\
+          \            mlflow.log_metric(\"val/mr\", validation_results.box.mr)\n\
+          \            mlflow.log_metric(\"val/nc\", validation_results.box.nc)\n\
+          \            results_output_metrics.log_metric(\"val/map\", validation_results.box.map)\n\
+          \            results_output_metrics.log_metric(\"val/map50\", validation_results.box.map50)\n\
+          \            results_output_metrics.log_metric(\"val/map75\", validation_results.box.map75)\n\
+          \            results_output_metrics.log_metric(\"val/mp\", validation_results.box.mp)\n\
+          \            results_output_metrics.log_metric(\"val/mr\", validation_results.box.mr)\n\
+          \            results_output_metrics.log_metric(\"val/nc\", validation_results.box.nc)\n\
+          \n        # Save the trained model\n        trained_model_path = os.path.join(images_dataset_volume_mount_path,\
+          \ f\"model-{run_name}.pt\")\n        model.save(trained_model_path)\n  \
+          \      mlflow.log_artifact(trained_model_path)\n        print(f\"Model saved\
+          \ to {trained_model_path}\")\n\n        onnx_path = model.export(format=\"\
+          onnx\")\n        if onnx_path:\n            mlflow.log_artifact(onnx_path)\n\
+          \        else:\n            print(\"Failed to export model to ONNX format\"\
+          )\n\n        # # End the run\n        # mlflow.end_run()\n\n        # print(\"\
+          Training results: \")\n        # print(vars(results))\n\n        print(f\"\
+          Copying {trained_model_path} to {output_model.path}\")\n        shutil.copy(trained_model_path,\
+          \ output_model.path)\n\n    if not os.path.exists(output_model.path):\n\
+          \        raise ValueError(\"Model not trained\")\n\n"
+        env:
+        - name: IMAGES_DATASET_S3_KEY
+          value: '{{channel:task=;name=images_dataset_root;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+        resources:
+          cpuLimit: 6.0
+          cpuRequest: 4.0
+          memoryLimit: 8.589934592
+          memoryRequest: 6.442450944
+    exec-upload-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - upload_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'boto3' 'botocore'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef upload_model(input_model: Input[Model]):\n    import os\n   \
+          \ import boto3\n    import botocore\n\n    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')\n\
+          \    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')\n \
+          \   endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n    region_name =\
+          \ os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name = os.environ.get('AWS_S3_BUCKET')\n\
+          \n    s3_key = os.environ.get(\"MODEL_S3_KEY\")\n\n    print(f\"Uploading\
+          \ {input_model.path} to {s3_key} in {bucket_name} bucket in {endpoint_url}\
+          \ endpoint\")\n\n    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,\n\
+          \                                    aws_secret_access_key=aws_secret_access_key)\n\
+          \n    s3_resource = session.resource(\n        's3',\n        config=botocore.client.Config(signature_version='s3v4'),\n\
+          \        endpoint_url=endpoint_url,\n        region_name=region_name)\n\n\
+          \    bucket = s3_resource.Bucket(bucket_name)\n\n    print(f\"Uploading\
+          \ {s3_key}\")\n    bucket.upload_file(input_model.path, s3_key)\n\n"
+        env:
+        - name: MODEL_S3_KEY
+          value: models/fraud/1/model.onnx
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+    exec-yield-not-deployed-error:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - yield_not_deployed_error
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'onnx==1.16.1'\
+          \ 'onnxruntime==1.18.0' 'scikit-learn==1.5.0' 'numpy==1.24.3' 'pandas==2.2.2'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef yield_not_deployed_error():\n    raise ValueError(\"Model not\
+          \ deployed\")\n\n"
+        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+pipelineInfo:
+  name: train
+root:
+  dag:
+    outputs:
+      artifacts:
+        train-model-results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-model
+    tasks:
+      condition-branches-1:
+        componentRef:
+          name: comp-condition-branches-1
+        dependentTasks:
+        - parse-metrics
+        - train-model
+        inputs:
+          artifacts:
+            pipelinechannel--train-model-output_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: train-model
+          parameters:
+            pipelinechannel--map75_threshold:
+              componentInputParameter: map75_threshold
+            pipelinechannel--parse-metrics-map75_output:
+              taskOutputParameter:
+                outputParameterKey: map75_output
+                producerTask: parse-metrics
+        taskInfo:
+          name: condition-branches-1
+      get-images-dataset:
+        cachingOptions: {}
+        componentRef:
+          name: comp-get-images-dataset
+        dependentTasks:
+        - setup-storage
+        inputs:
+          parameters:
+            force_clean:
+              componentInputParameter: force_clean
+            images_dataset_name:
+              componentInputParameter: images_dataset_name
+            images_dataset_root:
+              componentInputParameter: images_dataset_root
+            images_dataset_volume_mount_path:
+              runtimeValue:
+                constant: /opt/app-root/src/datasets
+            images_dataset_yaml:
+              componentInputParameter: images_dataset_yaml
+        taskInfo:
+          name: get-images-dataset
+      parse-metrics:
+        cachingOptions: {}
+        componentRef:
+          name: comp-parse-metrics
+        dependentTasks:
+        - train-model
+        inputs:
+          artifacts:
+            metrics_input:
+              taskOutputArtifact:
+                outputArtifactKey: results_output_metrics
+                producerTask: train-model
+        taskInfo:
+          name: parse-metrics
+      setup-storage:
+        cachingOptions: {}
+        componentRef:
+          name: comp-setup-storage
+        inputs:
+          parameters:
+            pvc_name:
+              componentInputParameter: images_dataset_pvc_name
+            size_in_gi:
+              runtimeValue:
+                constant: 1.0
+        taskInfo:
+          name: setup-storage
+      train-model:
+        cachingOptions: {}
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - get-images-dataset
+        inputs:
+          parameters:
+            batch_size:
+              componentInputParameter: batch_size
+            epochs:
+              componentInputParameter: epochs
+            experiment_name:
+              componentInputParameter: experiment_name
+            image_size:
+              componentInputParameter: image_size
+            images_dataset_name:
+              componentInputParameter: images_dataset_name
+            images_dataset_root:
+              componentInputParameter: images_dataset_root
+            images_dataset_volume_mount_path:
+              runtimeValue:
+                constant: /opt/app-root/src/datasets
+            images_dataset_yaml:
+              componentInputParameter: images_dataset_yaml
+            model_name:
+              componentInputParameter: model_name
+            run_name:
+              componentInputParameter: run_name
+            tracking_uri:
+              componentInputParameter: tracking_uri
+        taskInfo:
+          name: train-model
+  inputDefinitions:
+    parameters:
+      batch_size:
+        defaultValue: 2.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      enable_caching:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
+      epochs:
+        defaultValue: 1.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      experiment_name:
+        defaultValue: YOLOv8n
+        isOptional: true
+        parameterType: STRING
+      force_clean:
+        defaultValue: false
+        isOptional: true
+        parameterType: BOOLEAN
+      image_size:
+        defaultValue: 640.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      images_dataset_name:
+        defaultValue: uno-cards
+        isOptional: true
+        parameterType: STRING
+      images_dataset_pvc_name:
+        defaultValue: images-datasets-pvc
+        isOptional: true
+        parameterType: STRING
+      images_dataset_root:
+        defaultValue: datasets
+        isOptional: true
+        parameterType: STRING
+      images_dataset_yaml:
+        defaultValue: data.yaml
+        isOptional: true
+        parameterType: STRING
+      map75_threshold:
+        defaultValue: 0.1
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      model_name:
+        defaultValue: yolov8n
+        isOptional: true
+        parameterType: STRING
+      run_name:
+        defaultValue: yolo-run
+        isOptional: true
+        parameterType: STRING
+      tracking_uri:
+        defaultValue: http://mlflow-server:8080
+        isOptional: true
+        parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      train-model-results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0
+---
+platforms:
+  kubernetes:
+    deploymentSpec:
+      executors:
+        exec-get-images-dataset:
+          pvcMount:
+          - componentInputParameter: images_dataset_pvc_name
+            mountPath: /opt/app-root/src/datasets
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            secretName: aws-connection-datasets
+        exec-train-model:
+          pvcMount:
+          - componentInputParameter: images_dataset_pvc_name
+            mountPath: /opt/app-root/src/datasets
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            secretName: aws-connection-datasets
+        exec-upload-model:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            secretName: aws-connection-models

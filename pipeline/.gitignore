@@ -1,0 +1,7 @@
+__pycache__
+local*
+*.local
+*.old
+old*
+.vnev
+*.pt

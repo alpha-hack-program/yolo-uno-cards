@@ -1,0 +1,7 @@
+objectStorage:
+   objectBucketClaim:
+      enable: false
+   mlflowBucketName: mlflow
+   s3EndpointUrl: http://minio.ic-shared-minio.svc:9000
+   s3AccessKeyId: minio
+   s3SecretAccessKey: minio123
