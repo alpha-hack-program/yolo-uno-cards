@@ -13,7 +13,7 @@
 #    images_dataset_yaml: str [Default: 'data.yaml']
 #    map75_threshold: float [Default: 0.1]
 #    model_name: str [Default: 'yolov8n']
-#    run_name: str [Default: 'yolo-run']
+#    run_name: str [Default: 'uno-cards']
 #    tracking_uri: str [Default: 'http://mlflow-server:8080']
 # Outputs:
 #    train-model-results_output_metrics: system.Metrics
@@ -27,13 +27,19 @@ components:
             name: comp-upload-model
           inputs:
             artifacts:
-              input_model:
-                componentInputArtifact: pipelinechannel--train-model-output_model
+              input_model_onnx:
+                componentInputArtifact: pipelinechannel--train-model-output_onnx_model
+              input_model_pt:
+                componentInputArtifact: pipelinechannel--train-model-output_pt_model
           taskInfo:
             name: upload-model
     inputDefinitions:
       artifacts:
-        pipelinechannel--train-model-output_model:
+        pipelinechannel--train-model-output_onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        pipelinechannel--train-model-output_pt_model:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
@@ -65,8 +71,10 @@ components:
             name: comp-condition-2
           inputs:
             artifacts:
-              pipelinechannel--train-model-output_model:
-                componentInputArtifact: pipelinechannel--train-model-output_model
+              pipelinechannel--train-model-output_onnx_model:
+                componentInputArtifact: pipelinechannel--train-model-output_onnx_model
+              pipelinechannel--train-model-output_pt_model:
+                componentInputArtifact: pipelinechannel--train-model-output_pt_model
             parameters:
               pipelinechannel--map75_threshold:
                 componentInputParameter: pipelinechannel--map75_threshold
@@ -93,7 +101,11 @@ components:
               >= inputs.parameter_values[''pipelinechannel--map75_threshold''])'
     inputDefinitions:
       artifacts:
-        pipelinechannel--train-model-output_model:
+        pipelinechannel--train-model-output_onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        pipelinechannel--train-model-output_pt_model:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
@@ -175,7 +187,11 @@ components:
           parameterType: STRING
     outputDefinitions:
       artifacts:
-        output_model:
+        output_onnx_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        output_pt_model:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
@@ -187,7 +203,11 @@ components:
     executorLabel: exec-upload-model
     inputDefinitions:
       artifacts:
-        input_model:
+        input_model_onnx:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        input_model_pt:
           artifactType:
             schemaTitle: system.Model
             schemaVersion: 0.0.1
@@ -420,31 +440,33 @@ deploymentSpec:
           \    batch_size: int, \n    epochs: int, \n    experiment_name: str,\n \
           \   run_name: str,\n    tracking_uri: str,\n    images_dataset_name: str,\n\
           \    images_dataset_root: str,\n    images_dataset_yaml: str,\n    images_dataset_volume_mount_path:\
-          \ str,\n    output_model: Output[Model],\n    results_output_metrics: Output[Metrics]\n\
-          ):\n    import os\n    import shutil\n    import time\n\n    import torch\n\
-          \    from ultralytics import YOLO, settings\n    import mlflow\n\n    import\
-          \ numpy as np\n\n    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n\
-          \    region_name = os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name\
-          \ = os.environ.get('AWS_S3_BUCKET')\n    images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')\n\
-          \n    print(f\"tracking_uri {tracking_uri}\")\n    images_dataset_folder\
-          \ = os.path.join(images_dataset_volume_mount_path, images_dataset_name)\n\
-          \n    images_dataset_yaml_path = os.path.join(images_dataset_folder, images_dataset_yaml)\n\
-          \    print(f\"Checking if {images_dataset_yaml_path} exists\")\n    if not\
-          \ os.path.exists(images_dataset_yaml_path):\n        raise ValueError(f\"\
-          Dataset YAML file {images_dataset_yaml} not found in {images_dataset_folder}\"\
-          )\n    print(f\"Dataset YAML file found in {images_dataset_yaml_path}\"\
-          )\n\n    # Set the MLflow tracking URI and experiment\n    os.environ[\"\
-          MLFLOW_TRACKING_URI\"] = tracking_uri\n    os.environ[\"MLFLOW_EXPERIMENT_NAME\"\
-          ] = experiment_name\n\n    # Update a setting\n    settings.update({\"mlflow\"\
-          : True})\n\n    # Set device\n    device = \"cpu\"\n    if torch.cuda.is_available():\n\
-          \        device = \"cuda\"\n        print(f\"Using device: {torch.cuda.get_device_name(0)}\"\
+          \ str,\n    output_pt_model: Output[Model],\n    output_onnx_model: Output[Model],\n\
+          \    results_output_metrics: Output[Metrics]\n):\n    import os\n    import\
+          \ shutil\n    import time\n\n    import torch\n    from ultralytics import\
+          \ YOLO, settings\n    import mlflow\n\n    import numpy as np\n\n    endpoint_url\
+          \ = os.environ.get('AWS_S3_ENDPOINT')\n    region_name = os.environ.get('AWS_DEFAULT_REGION')\n\
+          \    bucket_name = os.environ.get('AWS_S3_BUCKET')\n    images_dataset_s3_key\
+          \ = os.environ.get('IMAGES_DATASET_S3_KEY')\n\n    print(f\"tracking_uri\
+          \ {tracking_uri}\")\n    images_dataset_folder = os.path.join(images_dataset_volume_mount_path,\
+          \ images_dataset_name)\n\n    images_dataset_yaml_path = os.path.join(images_dataset_folder,\
+          \ images_dataset_yaml)\n    print(f\"Checking if {images_dataset_yaml_path}\
+          \ exists\")\n    if not os.path.exists(images_dataset_yaml_path):\n    \
+          \    raise ValueError(f\"Dataset YAML file {images_dataset_yaml} not found\
+          \ in {images_dataset_folder}\")\n    print(f\"Dataset YAML file found in\
+          \ {images_dataset_yaml_path}\")\n\n    # Set the MLflow tracking URI and\
+          \ experiment\n    os.environ[\"MLFLOW_TRACKING_URI\"] = tracking_uri\n \
+          \   os.environ[\"MLFLOW_EXPERIMENT_NAME\"] = experiment_name\n\n    # Update\
+          \ a setting\n    settings.update({\"mlflow\": True})\n\n    # Set device\n\
+          \    device = \"cpu\"\n    if torch.cuda.is_available():\n        device\
+          \ = \"cuda\"\n        print(f\"Using device: {torch.cuda.get_device_name(0)}\"\
           )\n    elif torch.backends.mps.is_available():\n        device = \"mps\"\
           \n        print(\"Using device: MPS\")\n    print(f\"Using device: {device}\"\
-          )\n\n    # Set the run name\n    run_name = f\"{run_name}-{model_name}-{int(time.time())}\"\
-          \n    print(f\"Current run name: {run_name}\")\n\n    # Reset settings to\
-          \ default values\n    settings.reset()\n\n    # Load the model\n    model\
-          \ = YOLO(f'{model_name}.pt')\n\n    # Start the MLflow run\n    with mlflow.start_run(run_name=run_name):\n\
-          \        mlflow.log_param(\"dataset_file\", f\"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}\"\
+          )\n\n    # Reset settings to default values\n    settings.reset()\n\n  \
+          \  # Load the model\n    model = YOLO(f'{model_name}.pt')\n\n    # Set the\
+          \ run name\n    train_run_name = f\"{run_name}-{model_name}-train-{int(time.time())}\"\
+          \n    print(f\"Current run name: {train_run_name}\")\n\n    # Start the\
+          \ MLflow run for training\n    with mlflow.start_run(run_name=train_run_name)\
+          \ as training_mlrun:\n        mlflow.log_param(\"dataset_file\", f\"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}\"\
           )\n        mlflow.log_param(\"dataset_name\", images_dataset_name)\n   \
           \     mlflow.log_param(\"dataset_root\", images_dataset_root)\n        mlflow.log_param(\"\
           dataset_yaml\", images_dataset_yaml)\n        mlflow.log_param(\"device\"\
@@ -454,43 +476,47 @@ deploymentSpec:
           \   results = model.train(\n            data=images_dataset_yaml_path, \n\
           \            epochs=epochs, \n            imgsz=image_size, \n         \
           \   batch=batch_size, \n            device=device\n        )\n\n       \
-          \ if hasattr(results, 'box'):\n            mlflow.log_metric(\"training/map\"\
-          , results.box.map)\n            mlflow.log_metric(\"training/map50\", results.box.map50)\n\
-          \            mlflow.log_metric(\"training/map75\", results.box.map75)\n\
-          \            mlflow.log_metric(\"training/mp\", results.box.mp)\n      \
-          \      mlflow.log_metric(\"training/mr\", results.box.mr)\n            mlflow.log_metric(\"\
-          training/nc\", results.box.nc)\n            results_output_metrics.log_metric(\"\
+          \ if hasattr(results, 'box'):\n            results_output_metrics.log_metric(\"\
           training/map\", results.box.map)\n            results_output_metrics.log_metric(\"\
           training/map50\", results.box.map50)\n            results_output_metrics.log_metric(\"\
           training/map75\", results.box.map75)\n            results_output_metrics.log_metric(\"\
           training/mp\", results.box.mp)\n            results_output_metrics.log_metric(\"\
           training/mr\", results.box.mr)\n            results_output_metrics.log_metric(\"\
-          training/nc\", results.box.nc)\n\n\n        # Validate the model\n     \
-          \   validation_results = model.val()\n        # print(\"Validation results:\
-          \ \")\n        # print(vars(validation_results))\n\n        if hasattr(validation_results,\
-          \ 'box'):\n            mlflow.log_metric(\"val/map\", validation_results.box.map)\n\
-          \            mlflow.log_metric(\"val/map50\", validation_results.box.map50)\n\
-          \            mlflow.log_metric(\"val/map75\", validation_results.box.map75)\n\
-          \            mlflow.log_metric(\"val/mp\", validation_results.box.mp)\n\
-          \            mlflow.log_metric(\"val/mr\", validation_results.box.mr)\n\
-          \            mlflow.log_metric(\"val/nc\", validation_results.box.nc)\n\
-          \            results_output_metrics.log_metric(\"val/map\", validation_results.box.map)\n\
-          \            results_output_metrics.log_metric(\"val/map50\", validation_results.box.map50)\n\
-          \            results_output_metrics.log_metric(\"val/map75\", validation_results.box.map75)\n\
-          \            results_output_metrics.log_metric(\"val/mp\", validation_results.box.mp)\n\
-          \            results_output_metrics.log_metric(\"val/mr\", validation_results.box.mr)\n\
-          \            results_output_metrics.log_metric(\"val/nc\", validation_results.box.nc)\n\
-          \n        # Save the trained model\n        trained_model_path = os.path.join(images_dataset_volume_mount_path,\
-          \ f\"model-{run_name}.pt\")\n        model.save(trained_model_path)\n  \
-          \      mlflow.log_artifact(trained_model_path)\n        print(f\"Model saved\
-          \ to {trained_model_path}\")\n\n        onnx_path = model.export(format=\"\
-          onnx\")\n        if onnx_path:\n            mlflow.log_artifact(onnx_path)\n\
-          \        else:\n            print(\"Failed to export model to ONNX format\"\
-          )\n\n        # # End the run\n        # mlflow.end_run()\n\n        # print(\"\
-          Training results: \")\n        # print(vars(results))\n\n        print(f\"\
-          Copying {trained_model_path} to {output_model.path}\")\n        shutil.copy(trained_model_path,\
-          \ output_model.path)\n\n    if not os.path.exists(output_model.path):\n\
-          \        raise ValueError(\"Model not trained\")\n\n"
+          training/nc\", results.box.nc)\n        else:\n            print(\"No box\
+          \ attribute in the results!!!\")\n\n        # Save the trained model\n \
+          \       trained_model_pt_path = os.path.join(images_dataset_volume_mount_path,\
+          \ f\"model-{train_run_name}.pt\")\n        model.save(trained_model_pt_path)\n\
+          \        print(f\"Model saved to {trained_model_pt_path}\")\n\n        trained_model_onnx_path\
+          \ = model.export(format=\"onnx\")\n        if not trained_model_onnx_path:\n\
+          \            print(\"Failed to export model to ONNX format\")\n\n      \
+          \  # End the run\n        mlflow.end_run()\n\n        # Start the MLflow\
+          \ run for validation\n        val_run_name = f\"{run_name}-{model_name}-val-{int(time.time())}\"\
+          \n        print(f\"Current run name: {train_run_name}\")\n        with mlflow.start_run(run_name=val_run_name)\
+          \ as validation_mlrun:\n            # Validate the model    \n         \
+          \   validation_results = model.val()\n            # print(\"Validation results:\
+          \ \")\n            # print(vars(validation_results))\n\n            if hasattr(validation_results,\
+          \ 'box'):\n                mlflow.log_metric(\"val/map\", validation_results.box.map)\n\
+          \                mlflow.log_metric(\"val/map50\", validation_results.box.map50)\n\
+          \                mlflow.log_metric(\"val/map75\", validation_results.box.map75)\n\
+          \                mlflow.log_metric(\"val/mp\", validation_results.box.mp)\n\
+          \                mlflow.log_metric(\"val/mr\", validation_results.box.mr)\n\
+          \                mlflow.log_metric(\"val/nc\", validation_results.box.nc)\n\
+          \                results_output_metrics.log_metric(\"val/map\", validation_results.box.map)\n\
+          \                results_output_metrics.log_metric(\"val/map50\", validation_results.box.map50)\n\
+          \                results_output_metrics.log_metric(\"val/map75\", validation_results.box.map75)\n\
+          \                results_output_metrics.log_metric(\"val/mp\", validation_results.box.mp)\n\
+          \                results_output_metrics.log_metric(\"val/mr\", validation_results.box.mr)\n\
+          \                results_output_metrics.log_metric(\"val/nc\", validation_results.box.nc)\n\
+          \            else:\n                print(\"No box attribute in the results!!!\"\
+          )\n\n        # print(\"Training results: \")\n        # print(vars(results))\n\
+          \n        if not os.path.exists(trained_model_pt_path):\n            raise\
+          \ ValueError(\"Model was not trained\")\n\n        # Save the trained model\
+          \ as pytorch and onnx\n        print(f\"Copying {trained_model_pt_path}\
+          \ to {output_pt_model.path}\")\n        shutil.copy(trained_model_pt_path,\
+          \ output_pt_model.path)\n        print(f\"Copying {trained_model_onnx_path}\
+          \ to {output_onnx_model.path}\")\n        shutil.copy(trained_model_onnx_path,\
+          \ output_onnx_model.path)\n\n    if not training_mlrun:\n        raise ValueError(\"\
+          MLflow run was not started\")\n\n"
         env:
         - name: IMAGES_DATASET_S3_KEY
           value: '{{channel:task=;name=images_dataset_root;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
@@ -527,19 +553,21 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef upload_model(input_model: Input[Model]):\n    import os\n   \
-          \ import boto3\n    import botocore\n\n    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')\n\
-          \    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')\n \
-          \   endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n    region_name =\
-          \ os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name = os.environ.get('AWS_S3_BUCKET')\n\
-          \n    s3_key = os.environ.get(\"MODEL_S3_KEY\")\n\n    print(f\"Uploading\
-          \ {input_model.path} to {s3_key} in {bucket_name} bucket in {endpoint_url}\
-          \ endpoint\")\n\n    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,\n\
+          \ *\n\ndef upload_model(\n    input_model_pt: Input[Model],\n    input_model_onnx:\
+          \ Input[Model]\n    ):\n    import os\n    import boto3\n    import botocore\n\
+          \n    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')\n    aws_secret_access_key\
+          \ = os.environ.get('AWS_SECRET_ACCESS_KEY')\n    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n\
+          \    region_name = os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name\
+          \ = os.environ.get('AWS_S3_BUCKET')\n\n    s3_key = os.environ.get(\"MODEL_S3_KEY\"\
+          )\n\n    print(f\"Uploading {input_model_pt.path} and {input_model_onnx.path}\
+          \ to {s3_key} in {bucket_name} bucket in {endpoint_url} endpoint\")\n\n\
+          \    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,\n\
           \                                    aws_secret_access_key=aws_secret_access_key)\n\
           \n    s3_resource = session.resource(\n        's3',\n        config=botocore.client.Config(signature_version='s3v4'),\n\
           \        endpoint_url=endpoint_url,\n        region_name=region_name)\n\n\
           \    bucket = s3_resource.Bucket(bucket_name)\n\n    print(f\"Uploading\
-          \ {s3_key}\")\n    bucket.upload_file(input_model.path, s3_key)\n\n"
+          \ {s3_key}\")\n    bucket.upload_file(input_model_pt.path, s3_key)\n   \
+          \ bucket.upload_file(input_model_onnx.path, s3_key)\n\n"
         env:
         - name: MODEL_S3_KEY
           value: models/fraud/1/model.onnx
@@ -594,9 +622,13 @@ root:
         - train-model
         inputs:
           artifacts:
-            pipelinechannel--train-model-output_model:
+            pipelinechannel--train-model-output_onnx_model:
               taskOutputArtifact:
-                outputArtifactKey: output_model
+                outputArtifactKey: output_onnx_model
+                producerTask: train-model
+            pipelinechannel--train-model-output_pt_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_pt_model
                 producerTask: train-model
           parameters:
             pipelinechannel--map75_threshold:
@@ -739,7 +771,7 @@ root:
         isOptional: true
         parameterType: STRING
       run_name:
-        defaultValue: yolo-run
+        defaultValue: uno-cards
         isOptional: true
         parameterType: STRING
       tracking_uri:

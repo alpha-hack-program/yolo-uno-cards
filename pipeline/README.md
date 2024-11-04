@@ -83,7 +83,7 @@ PIPELINE_RUN_ID=$(echo ${PIPELINE_RUN} | jq -r .run_id)
 
 # MLFLOW
 
-values.yaml
+Create `mlflow-values.yaml` with this values:
 
 ```yaml
 objectStorage:
@@ -95,8 +95,31 @@ objectStorage:
    s3SecretAccessKey: minio123
 ```
 
+Run this command:
+
 ```sh
+helm repo add strangiato https://strangiato.github.io/helm-charts/
 helm upgrade -i mlflow-server --values mlflow-values.yaml strangiato/mlflow-server
 ```
 
-mlflow-server.iniciativa-2.svc.cluster.local
+Use the service name `mlflow-server`.
+
+# If ArgoCD
+
+Add a dependency.
+
+```yaml
+apiVersion: v2
+name: example-chart
+description: A Helm chart for Kubernetes
+type: application
+
+version: 0.1.0
+
+appVersion: "1.16.0"
+
+dependencies:
+  - name: "odh"
+    version: "0.1.3"
+    repository: "https://strangiato.github.io/helm-charts/"
+```

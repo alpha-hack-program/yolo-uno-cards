@@ -252,7 +252,8 @@ def train_model(
     images_dataset_root: str,
     images_dataset_yaml: str,
     images_dataset_volume_mount_path: str,
-    output_model: Output[Model],
+    output_pt_model: Output[Model],
+    output_onnx_model: Output[Model],
     results_output_metrics: Output[Metrics]
 ):
     import os
@@ -296,18 +297,18 @@ def train_model(
         print("Using device: MPS")
     print(f"Using device: {device}")
 
-    # Set the run name
-    run_name = f"{run_name}-{model_name}-{int(time.time())}"
-    print(f"Current run name: {run_name}")
-
     # Reset settings to default values
     settings.reset()
 
     # Load the model
     model = YOLO(f'{model_name}.pt')
 
-    # Start the MLflow run
-    with mlflow.start_run(run_name=run_name):
+    # Set the run name
+    train_run_name = f"{run_name}-{model_name}-train-{int(time.time())}"
+    print(f"Current run name: {train_run_name}")
+
+    # Start the MLflow run for training
+    with mlflow.start_run(run_name=train_run_name) as training_mlrun:
         mlflow.log_param("dataset_file", f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}")
         mlflow.log_param("dataset_name", images_dataset_name)
         mlflow.log_param("dataset_root", images_dataset_root)
@@ -326,63 +327,66 @@ def train_model(
         )
         
         if hasattr(results, 'box'):
-            mlflow.log_metric("training/map", results.box.map)
-            mlflow.log_metric("training/map50", results.box.map50)
-            mlflow.log_metric("training/map75", results.box.map75)
-            mlflow.log_metric("training/mp", results.box.mp)
-            mlflow.log_metric("training/mr", results.box.mr)
-            mlflow.log_metric("training/nc", results.box.nc)
             results_output_metrics.log_metric("training/map", results.box.map)
             results_output_metrics.log_metric("training/map50", results.box.map50)
             results_output_metrics.log_metric("training/map75", results.box.map75)
             results_output_metrics.log_metric("training/mp", results.box.mp)
             results_output_metrics.log_metric("training/mr", results.box.mr)
             results_output_metrics.log_metric("training/nc", results.box.nc)
-
-        
-        # Validate the model
-        validation_results = model.val()
-        # print("Validation results: ")
-        # print(vars(validation_results))
-
-        if hasattr(validation_results, 'box'):
-            mlflow.log_metric("val/map", validation_results.box.map)
-            mlflow.log_metric("val/map50", validation_results.box.map50)
-            mlflow.log_metric("val/map75", validation_results.box.map75)
-            mlflow.log_metric("val/mp", validation_results.box.mp)
-            mlflow.log_metric("val/mr", validation_results.box.mr)
-            mlflow.log_metric("val/nc", validation_results.box.nc)
-            results_output_metrics.log_metric("val/map", validation_results.box.map)
-            results_output_metrics.log_metric("val/map50", validation_results.box.map50)
-            results_output_metrics.log_metric("val/map75", validation_results.box.map75)
-            results_output_metrics.log_metric("val/mp", validation_results.box.mp)
-            results_output_metrics.log_metric("val/mr", validation_results.box.mr)
-            results_output_metrics.log_metric("val/nc", validation_results.box.nc)
-        
-        # Save the trained model
-        trained_model_path = os.path.join(images_dataset_volume_mount_path, f"model-{run_name}.pt")
-        model.save(trained_model_path)
-        mlflow.log_artifact(trained_model_path)
-        print(f"Model saved to {trained_model_path}")
-
-        onnx_path = model.export(format="onnx")
-        if onnx_path:
-            mlflow.log_artifact(onnx_path)
         else:
+            print("No box attribute in the results!!!")
+
+        # Save the trained model
+        trained_model_pt_path = os.path.join(images_dataset_volume_mount_path, f"model-{train_run_name}.pt")
+        model.save(trained_model_pt_path)
+        print(f"Model saved to {trained_model_pt_path}")
+
+        trained_model_onnx_path = model.export(format="onnx")
+        if not trained_model_onnx_path:
             print("Failed to export model to ONNX format")
 
-        # # End the run
-        # mlflow.end_run()
+        # End the run
+        mlflow.end_run()
 
+        # Start the MLflow run for validation
+        val_run_name = f"{run_name}-{model_name}-val-{int(time.time())}"
+        print(f"Current run name: {train_run_name}")
+        with mlflow.start_run(run_name=val_run_name) as validation_mlrun:
+            # Validate the model    
+            validation_results = model.val()
+            # print("Validation results: ")
+            # print(vars(validation_results))
+
+            if hasattr(validation_results, 'box'):
+                mlflow.log_metric("val/map", validation_results.box.map)
+                mlflow.log_metric("val/map50", validation_results.box.map50)
+                mlflow.log_metric("val/map75", validation_results.box.map75)
+                mlflow.log_metric("val/mp", validation_results.box.mp)
+                mlflow.log_metric("val/mr", validation_results.box.mr)
+                mlflow.log_metric("val/nc", validation_results.box.nc)
+                results_output_metrics.log_metric("val/map", validation_results.box.map)
+                results_output_metrics.log_metric("val/map50", validation_results.box.map50)
+                results_output_metrics.log_metric("val/map75", validation_results.box.map75)
+                results_output_metrics.log_metric("val/mp", validation_results.box.mp)
+                results_output_metrics.log_metric("val/mr", validation_results.box.mr)
+                results_output_metrics.log_metric("val/nc", validation_results.box.nc)
+            else:
+                print("No box attribute in the results!!!")
+            
         # print("Training results: ")
         # print(vars(results))
 
-        print(f"Copying {trained_model_path} to {output_model.path}")
-        shutil.copy(trained_model_path, output_model.path)
+        if not os.path.exists(trained_model_pt_path):
+            raise ValueError("Model was not trained")
+    
+        # Save the trained model as pytorch and onnx
+        print(f"Copying {trained_model_pt_path} to {output_pt_model.path}")
+        shutil.copy(trained_model_pt_path, output_pt_model.path)
+        print(f"Copying {trained_model_onnx_path} to {output_onnx_model.path}")
+        shutil.copy(trained_model_onnx_path, output_onnx_model.path)
 
-    if not os.path.exists(output_model.path):
-        raise ValueError("Model not trained")
-
+    if not training_mlrun:
+        raise ValueError("MLflow run was not started")
 
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
@@ -412,7 +416,10 @@ def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
     packages_to_install=["boto3", "botocore"]
 )
-def upload_model(input_model: Input[Model]):
+def upload_model(
+    input_model_pt: Input[Model],
+    input_model_onnx: Input[Model]
+    ):
     import os
     import boto3
     import botocore
@@ -425,7 +432,7 @@ def upload_model(input_model: Input[Model]):
 
     s3_key = os.environ.get("MODEL_S3_KEY")
 
-    print(f"Uploading {input_model.path} to {s3_key} in {bucket_name} bucket in {endpoint_url} endpoint")
+    print(f"Uploading {input_model_pt.path} and {input_model_onnx.path} to {s3_key} in {bucket_name} bucket in {endpoint_url} endpoint")
 
     session = boto3.session.Session(aws_access_key_id=aws_access_key_id,
                                     aws_secret_access_key=aws_secret_access_key)
@@ -439,7 +446,8 @@ def upload_model(input_model: Input[Model]):
     bucket = s3_resource.Bucket(bucket_name)
 
     print(f"Uploading {s3_key}")
-    bucket.upload_file(input_model.path, s3_key)
+    bucket.upload_file(input_model_pt.path, s3_key)
+    bucket.upload_file(input_model_onnx.path, s3_key)
 
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
@@ -494,13 +502,13 @@ def refresh_deployment(deployment_name: str):
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    map75_threshold: float = 0.1, 
+    map75_threshold: float = 0.90, 
     model_name: str = "yolov8n", 
     image_size: int = 640, 
     batch_size: int = 2, 
     epochs: int = 1, 
     experiment_name: str = "YOLOv8n",
-    run_name: str = "yolo-run",
+    run_name: str = "uno-cards",
     tracking_uri: str = "http://mlflow-server:8080",
     images_dataset_name: str = "uno-cards",
     images_dataset_root: str = "datasets",
@@ -556,7 +564,6 @@ def pipeline(
     train_model_task.set_cpu_limit("6")
     # train_model_task.set_accelerator_type("nvidia.com/gpu.product")
     
-
     # Mount the PVC to the task 
     kubernetes.mount_pvc(
         train_model_task,
@@ -571,7 +578,10 @@ def pipeline(
     # Use the parsed accuracy to decide if we should upload the model
     # Doc: https://www.kubeflow.org/docs/components/pipelines/user-guides/core-functions/execute-kfp-pipelines-locally/
     with dsl.If(map75 >= map75_threshold):
-        upload_model_task = upload_model(input_model=train_model_task.outputs["output_model"]).after(parse_metrics_task).set_caching_options(False)
+        upload_model_task = upload_model(
+            input_model_pt=train_model_task.outputs["output_pt_model"],
+            input_model_onnx=train_model_task.outputs["output_onnx_model"]
+        ).after(parse_metrics_task).set_caching_options(False)
 
         # Setting environment variables for upload_model_task
         upload_model_task.set_env_variable(name="MODEL_S3_KEY", value="models/fraud/1/model.onnx")
