@@ -11,7 +11,7 @@
 #    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
 #    images_dataset_root: str [Default: 'datasets']
 #    images_dataset_yaml: str [Default: 'data.yaml']
-#    map75_threshold: float [Default: 0.1]
+#    map75_threshold: float [Default: 0.9]
 #    model_name: str [Default: 'yolov8n']
 #    run_name: str [Default: 'uno-cards']
 #    tracking_uri: str [Default: 'http://mlflow-server:8080']
@@ -763,7 +763,7 @@ root:
         isOptional: true
         parameterType: STRING
       map75_threshold:
-        defaultValue: 0.1
+        defaultValue: 0.9
         isOptional: true
         parameterType: NUMBER_DOUBLE
       model_name:
