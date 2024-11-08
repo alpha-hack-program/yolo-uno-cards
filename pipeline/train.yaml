@@ -7,12 +7,14 @@
 #    experiment_name: str [Default: 'YOLOv8n']
 #    force_clean: bool [Default: False]
 #    image_size: int [Default: 640.0]
-#    images_dataset_name: str [Default: 'uno-cards']
+#    images_dataset_name: str [Default: 'uno-cards-v1.0']
 #    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
-#    images_dataset_root: str [Default: 'datasets']
+#    images_dataset_pvc_size_in_gi: int [Default: 5.0]
 #    images_dataset_yaml: str [Default: 'data.yaml']
+#    images_datasets_root_folder: str [Default: 'datasets']
 #    map75_threshold: float [Default: 0.9]
 #    model_name: str [Default: 'yolov8n']
+#    models_root_folder: str [Default: 'models']
 #    run_name: str [Default: 'uno-cards']
 #    tracking_uri: str [Default: 'http://mlflow-server:8080']
 # Outputs:
@@ -26,28 +28,26 @@ components:
           componentRef:
             name: comp-upload-model
           inputs:
-            artifacts:
-              input_model_onnx:
-                componentInputArtifact: pipelinechannel--train-model-output_onnx_model
-              input_model_pt:
-                componentInputArtifact: pipelinechannel--train-model-output_pt_model
+            parameters:
+              model_name:
+                componentInputParameter: pipelinechannel--train-model-model_name_output
+              models_root_folder:
+                componentInputParameter: pipelinechannel--models_root_folder
+              root_mount_path:
+                runtimeValue:
+                  constant: /opt/app-root/src
           taskInfo:
             name: upload-model
     inputDefinitions:
-      artifacts:
-        pipelinechannel--train-model-output_onnx_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
-        pipelinechannel--train-model-output_pt_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
       parameters:
         pipelinechannel--map75_threshold:
           parameterType: NUMBER_DOUBLE
+        pipelinechannel--models_root_folder:
+          parameterType: STRING
         pipelinechannel--parse-metrics-map75_output:
           parameterType: NUMBER_DOUBLE
+        pipelinechannel--train-model-model_name_output:
+          parameterType: STRING
   comp-condition-3:
     dag:
       tasks:
@@ -70,16 +70,15 @@ components:
           componentRef:
             name: comp-condition-2
           inputs:
-            artifacts:
-              pipelinechannel--train-model-output_onnx_model:
-                componentInputArtifact: pipelinechannel--train-model-output_onnx_model
-              pipelinechannel--train-model-output_pt_model:
-                componentInputArtifact: pipelinechannel--train-model-output_pt_model
             parameters:
               pipelinechannel--map75_threshold:
                 componentInputParameter: pipelinechannel--map75_threshold
+              pipelinechannel--models_root_folder:
+                componentInputParameter: pipelinechannel--models_root_folder
               pipelinechannel--parse-metrics-map75_output:
                 componentInputParameter: pipelinechannel--parse-metrics-map75_output
+              pipelinechannel--train-model-model_name_output:
+                componentInputParameter: pipelinechannel--train-model-model_name_output
           taskInfo:
             name: condition-2
           triggerPolicy:
@@ -100,20 +99,15 @@ components:
             condition: '!(inputs.parameter_values[''pipelinechannel--parse-metrics-map75_output'']
               >= inputs.parameter_values[''pipelinechannel--map75_threshold''])'
     inputDefinitions:
-      artifacts:
-        pipelinechannel--train-model-output_onnx_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
-        pipelinechannel--train-model-output_pt_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
       parameters:
         pipelinechannel--map75_threshold:
           parameterType: NUMBER_DOUBLE
+        pipelinechannel--models_root_folder:
+          parameterType: STRING
         pipelinechannel--parse-metrics-map75_output:
           parameterType: NUMBER_DOUBLE
+        pipelinechannel--train-model-model_name_output:
+          parameterType: STRING
   comp-get-images-dataset:
     executorLabel: exec-get-images-dataset
     inputDefinitions:
@@ -122,11 +116,11 @@ components:
           parameterType: BOOLEAN
         images_dataset_name:
           parameterType: STRING
-        images_dataset_root:
-          parameterType: STRING
-        images_dataset_volume_mount_path:
-          parameterType: STRING
         images_dataset_yaml:
+          parameterType: STRING
+        images_datasets_root_folder:
+          parameterType: STRING
+        root_mount_path:
           parameterType: STRING
   comp-parse-metrics:
     executorLabel: exec-parse-metrics
@@ -173,13 +167,15 @@ components:
           parameterType: NUMBER_INTEGER
         images_dataset_name:
           parameterType: STRING
-        images_dataset_root:
-          parameterType: STRING
-        images_dataset_volume_mount_path:
-          parameterType: STRING
         images_dataset_yaml:
           parameterType: STRING
+        images_datasets_root_folder:
+          parameterType: STRING
         model_name:
+          parameterType: STRING
+        models_root_folder:
+          parameterType: STRING
+        root_mount_path:
           parameterType: STRING
         run_name:
           parameterType: STRING
@@ -187,30 +183,23 @@ components:
           parameterType: STRING
     outputDefinitions:
       artifacts:
-        output_onnx_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
-        output_pt_model:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
         results_output_metrics:
           artifactType:
             schemaTitle: system.Metrics
             schemaVersion: 0.0.1
+      parameters:
+        model_name_output:
+          parameterType: STRING
   comp-upload-model:
     executorLabel: exec-upload-model
     inputDefinitions:
-      artifacts:
-        input_model_onnx:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
-        input_model_pt:
-          artifactType:
-            schemaTitle: system.Model
-            schemaVersion: 0.0.1
+      parameters:
+        model_name:
+          parameterType: STRING
+        models_root_folder:
+          parameterType: STRING
+        root_mount_path:
+          parameterType: STRING
   comp-yield-not-deployed-error:
     executorLabel: exec-yield-not-deployed-error
 deploymentSpec:
@@ -242,15 +231,15 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef get_images_dataset(\n    images_dataset_root: str, \n    images_dataset_name:\
-          \ str,\n    images_dataset_yaml: str,\n    images_dataset_volume_mount_path:\
+          \ *\n\ndef get_images_dataset(\n    images_datasets_root_folder: str, \n\
+          \    images_dataset_name: str,\n    images_dataset_yaml: str,\n    root_mount_path:\
           \ str,\n    force_clean: bool\n):\n    import boto3\n    import botocore\n\
           \    import os\n    import shutil\n    import re\n\n    aws_access_key_id\
           \ = os.environ.get('AWS_ACCESS_KEY_ID')\n    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')\n\
           \    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n    region_name =\
           \ os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name = os.environ.get('AWS_S3_BUCKET')\n\
           \n    # Construct and set the IMAGES_DATASET_S3_KEY environment variable\n\
-          \    images_dataset_s3_key = f\"{images_dataset_root}/{images_dataset_name}.zip\"\
+          \    images_dataset_s3_key = f\"{images_datasets_root_folder}/{images_dataset_name}.zip\"\
           \n\n    print(f\"images_dataset_s3_key = {images_dataset_s3_key}\")\n\n\
           \    session = boto3.session.Session(\n        aws_access_key_id=aws_access_key_id,\n\
           \        aws_secret_access_key=aws_secret_access_key\n    )\n\n    s3_resource\
@@ -269,17 +258,17 @@ deploymentSpec:
           \ {bucket_name}\")\n\n    print(f\"Downloading {images_dataset_s3_key} to\
           \ {local_file_path}\")\n    bucket.download_file(images_dataset_s3_key,\
           \ local_file_path)\n    print(f\"Downloaded {images_dataset_s3_key}\")\n\
-          \n    # Ensure mount path exists\n    if not os.path.exists(images_dataset_volume_mount_path):\n\
-          \        os.makedirs(images_dataset_volume_mount_path)\n\n    # List the\
-          \ files in the mount path\n    print(f\"Listing files in {images_dataset_volume_mount_path}\"\
-          )\n    print(os.listdir(images_dataset_volume_mount_path))\n\n    # If we\
-          \ haven't unzipped the file yet or we're forced to, unzip it\n    images_dataset_folder\
-          \ = f\"{images_dataset_volume_mount_path}/{images_dataset_name}\"\n    if\
-          \ not os.path.exists(images_dataset_folder) or force_clean:\n        # Unzip\
-          \ the file into the images dataset volume mount path\n        print(f\"\
-          Unzipping {local_file_path} to {images_dataset_volume_mount_path}\")\n \
-          \       shutil.unpack_archive(f'{local_file_path}', f'{images_dataset_volume_mount_path}')\n\
-          \        print(f\"Unzipped {local_file_path} to {images_dataset_volume_mount_path}\"\
+          \n    # Dataset path\n    images_dataset_path = f\"{root_mount_path}/{images_datasets_root_folder}\"\
+          \n\n    # Ensure dataset path exists\n    if not os.path.exists(images_dataset_path):\n\
+          \        os.makedirs(images_dataset_path)\n\n    # List the files in the\
+          \ dataset path\n    print(f\"Listing files in {images_dataset_path}\")\n\
+          \    print(os.listdir(images_dataset_path))\n\n    # If we haven't unzipped\
+          \ the file yet or we're forced to, unzip it\n    images_dataset_folder =\
+          \ f\"{images_dataset_path}/{images_dataset_name}\"\n    if not os.path.exists(images_dataset_folder)\
+          \ or force_clean:\n        # Unzip the file into the images dataset volume\
+          \ mount path\n        print(f\"Unzipping {local_file_path} to {images_dataset_path}\"\
+          )\n        shutil.unpack_archive(f'{local_file_path}', f'{images_dataset_path}')\n\
+          \        print(f\"Unzipped {local_file_path} to {images_dataset_path}\"\
           )\n\n        # List the files inside images_dataset_folder folder\n    \
           \    print(f\"Listing files in {images_dataset_folder}\")\n        print(os.listdir(images_dataset_folder))\n\
           \n    # Locate the YAML file in the dataset folder and replace the path\
@@ -296,7 +285,7 @@ deploymentSpec:
           \ 'w') as f:\n            f.write(data)\n\n"
         env:
         - name: IMAGES_DATASET_S3_KEY
-          value: '{{channel:task=;name=images_dataset_root;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
+          value: '{{channel:task=;name=images_datasets_root_folder;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
         image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
     exec-parse-metrics:
       container:
@@ -403,10 +392,10 @@ deploymentSpec:
           \                requests={\"storage\": f\"{size_in_gi}Gi\"}\n         \
           \   )\n        )\n    )\n\n    # Add storage class if provided\n    if storage_class:\n\
           \        pvc_spec.spec.storage_class_name = storage_class\n\n    # Attempt\
-          \ to create the PVC\n    try:\n        v1.create_namespaced_persistent_volume_claim(namespace=\"\
-          default\", body=pvc_spec)\n        print(f\"PVC '{pvc_name}' created successfully.\"\
-          )\n    except ApiException as e:\n        raise RuntimeError(f\"Failed to\
-          \ create PVC: {e.reason}\")\n\n"
+          \ to create the PVC\n    try:\n        v1.create_namespaced_persistent_volume_claim(namespace=namespace,\
+          \ body=pvc_spec)\n        print(f\"PVC '{pvc_name}' created successfully\
+          \ in namespace '{namespace}'.\")\n    except ApiException as e:\n      \
+          \  raise RuntimeError(f\"Failed to create PVC: {e.reason}\")\n\n"
         image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
     exec-train-model:
       container:
@@ -439,23 +428,40 @@ deploymentSpec:
           \ *\n\ndef train_model(\n    model_name: str, \n    image_size: int, \n\
           \    batch_size: int, \n    epochs: int, \n    experiment_name: str,\n \
           \   run_name: str,\n    tracking_uri: str,\n    images_dataset_name: str,\n\
-          \    images_dataset_root: str,\n    images_dataset_yaml: str,\n    images_dataset_volume_mount_path:\
-          \ str,\n    output_pt_model: Output[Model],\n    output_onnx_model: Output[Model],\n\
-          \    results_output_metrics: Output[Metrics]\n):\n    import os\n    import\
-          \ shutil\n    import time\n\n    import torch\n    from ultralytics import\
-          \ YOLO, settings\n    import mlflow\n\n    import numpy as np\n\n    endpoint_url\
-          \ = os.environ.get('AWS_S3_ENDPOINT')\n    region_name = os.environ.get('AWS_DEFAULT_REGION')\n\
-          \    bucket_name = os.environ.get('AWS_S3_BUCKET')\n    images_dataset_s3_key\
-          \ = os.environ.get('IMAGES_DATASET_S3_KEY')\n\n    print(f\"tracking_uri\
-          \ {tracking_uri}\")\n    images_dataset_folder = os.path.join(images_dataset_volume_mount_path,\
-          \ images_dataset_name)\n\n    images_dataset_yaml_path = os.path.join(images_dataset_folder,\
-          \ images_dataset_yaml)\n    print(f\"Checking if {images_dataset_yaml_path}\
-          \ exists\")\n    if not os.path.exists(images_dataset_yaml_path):\n    \
-          \    raise ValueError(f\"Dataset YAML file {images_dataset_yaml} not found\
-          \ in {images_dataset_folder}\")\n    print(f\"Dataset YAML file found in\
-          \ {images_dataset_yaml_path}\")\n\n    # Set the MLflow tracking URI and\
-          \ experiment\n    os.environ[\"MLFLOW_TRACKING_URI\"] = tracking_uri\n \
-          \   os.environ[\"MLFLOW_EXPERIMENT_NAME\"] = experiment_name\n\n    # Update\
+          \    images_datasets_root_folder: str,\n    images_dataset_yaml: str,\n\
+          \    models_root_folder: str,\n    root_mount_path: str,\n    model_name_output:\
+          \ OutputPath(str),\n    results_output_metrics: Output[Metrics]\n):\n  \
+          \  import os\n    import shutil\n    import time\n\n    import torch\n \
+          \   from ultralytics import YOLO, settings\n    import mlflow\n\n    import\
+          \ numpy as np\n\n    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n\
+          \    region_name = os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name\
+          \ = os.environ.get('AWS_S3_BUCKET')\n    images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')\n\
+          \n    print(f\"S3: endpoint_url {endpoint_url}\")\n    print(f\"S3: bucket_name\
+          \ {bucket_name}\")\n    print(f\"S3: images_dataset_s3_key {images_dataset_s3_key}\"\
+          )\n\n    print(f\"tracking_uri {tracking_uri}\")\n    print(f\"experiment_name\
+          \ {experiment_name}\")\n    print(f\"images_dataset_name {images_dataset_name}\"\
+          )\n    print(f\"images_datasets_root_folder {images_datasets_root_folder}\"\
+          )\n    print(f\"images_dataset_yaml {images_dataset_yaml}\")\n    print(f\"\
+          models_root_folder {models_root_folder}\")\n    print(f\"root_mount_path\
+          \ {root_mount_path}\")\n\n    # If root_mount_path is not set or doesn't\
+          \ exist, raise a ValueError\n    if not root_mount_path or not os.path.exists(root_mount_path):\n\
+          \        raise ValueError(f\"Root mount path '{root_mount_path}' does not\
+          \ exist\")\n\n    # Set the images dataset folder\n    images_dataset_folder\
+          \ = os.path.join(root_mount_path, images_datasets_root_folder, images_dataset_name)\n\
+          \n    # If the images dataset folder doesn't exist, raise a ValueError\n\
+          \    if not os.path.exists(images_dataset_folder):\n        raise ValueError(f\"\
+          Images dataset folder {images_dataset_folder} does not exist\")\n\n    #\
+          \ Set the models folder\n    models_folder = os.path.join(root_mount_path,\
+          \ models_root_folder)\n\n    # Make sure the models folder exists\n    if\
+          \ not os.path.exists(models_folder):\n        os.makedirs(models_folder)\n\
+          \n    # Set the images dataset YAML path\n    images_dataset_yaml_path =\
+          \ os.path.join(images_dataset_folder, images_dataset_yaml)\n    print(f\"\
+          Checking if {images_dataset_yaml_path} exists\")\n    if not os.path.exists(images_dataset_yaml_path):\n\
+          \        raise ValueError(f\"Dataset YAML file {images_dataset_yaml} not\
+          \ found in {images_dataset_folder}\")\n    print(f\"Dataset YAML file found\
+          \ in {images_dataset_yaml_path}\")\n\n    # Set the MLflow tracking URI\
+          \ and experiment\n    os.environ[\"MLFLOW_TRACKING_URI\"] = tracking_uri\n\
+          \    os.environ[\"MLFLOW_EXPERIMENT_NAME\"] = experiment_name\n\n    # Update\
           \ a setting\n    settings.update({\"mlflow\": True})\n\n    # Set device\n\
           \    device = \"cpu\"\n    if torch.cuda.is_available():\n        device\
           \ = \"cuda\"\n        print(f\"Using device: {torch.cuda.get_device_name(0)}\"\
@@ -468,15 +474,15 @@ deploymentSpec:
           \ MLflow run for training\n    with mlflow.start_run(run_name=train_run_name)\
           \ as training_mlrun:\n        mlflow.log_param(\"dataset_file\", f\"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}\"\
           )\n        mlflow.log_param(\"dataset_name\", images_dataset_name)\n   \
-          \     mlflow.log_param(\"dataset_root\", images_dataset_root)\n        mlflow.log_param(\"\
-          dataset_yaml\", images_dataset_yaml)\n        mlflow.log_param(\"device\"\
-          , device)\n        mlflow.log_param(\"batch_size\", batch_size)\n      \
-          \  mlflow.log_param(\"imgsz\", image_size)\n\n        print(f\"Training\
-          \ model {model_name} with dataset {images_dataset_yaml_path}.\")\n     \
-          \   results = model.train(\n            data=images_dataset_yaml_path, \n\
-          \            epochs=epochs, \n            imgsz=image_size, \n         \
-          \   batch=batch_size, \n            device=device\n        )\n\n       \
-          \ if hasattr(results, 'box'):\n            results_output_metrics.log_metric(\"\
+          \     mlflow.log_param(\"datasets_root_folder\", images_datasets_root_folder)\n\
+          \        mlflow.log_param(\"dataset_yaml\", images_dataset_yaml)\n     \
+          \   mlflow.log_param(\"device\", device)\n        mlflow.log_param(\"batch_size\"\
+          , batch_size)\n        mlflow.log_param(\"imgsz\", image_size)\n\n     \
+          \   print(f\"Training model {model_name} with dataset {images_dataset_yaml_path}.\"\
+          )\n        results = model.train(\n            data=images_dataset_yaml_path,\
+          \ \n            epochs=epochs, \n            imgsz=image_size, \n      \
+          \      batch=batch_size, \n            device=device\n        )\n\n    \
+          \    if hasattr(results, 'box'):\n            results_output_metrics.log_metric(\"\
           training/map\", results.box.map)\n            results_output_metrics.log_metric(\"\
           training/map50\", results.box.map50)\n            results_output_metrics.log_metric(\"\
           training/map75\", results.box.map75)\n            results_output_metrics.log_metric(\"\
@@ -484,17 +490,20 @@ deploymentSpec:
           training/mr\", results.box.mr)\n            results_output_metrics.log_metric(\"\
           training/nc\", results.box.nc)\n        else:\n            print(\"No box\
           \ attribute in the results!!!\")\n\n        # Save the trained model\n \
-          \       trained_model_pt_path = os.path.join(images_dataset_volume_mount_path,\
-          \ f\"model-{train_run_name}.pt\")\n        model.save(trained_model_pt_path)\n\
-          \        print(f\"Model saved to {trained_model_pt_path}\")\n\n        trained_model_onnx_path\
-          \ = model.export(format=\"onnx\")\n        if not trained_model_onnx_path:\n\
-          \            print(\"Failed to export model to ONNX format\")\n\n      \
-          \  # End the run\n        mlflow.end_run()\n\n        # Start the MLflow\
+          \       print(f\"Saving model to {models_folder}\")\n        trained_model_name\
+          \ = f\"model-{train_run_name}\"\n        print(f\"Trained model name: {trained_model_name}\"\
+          )\n        trained_model_pt_path = os.path.join(models_folder, f\"{trained_model_name}.pt\"\
+          )\n        print(f\"Saving model to {trained_model_pt_path}\")\n       \
+          \ model.save(trained_model_pt_path)\n        print(f\"Model saved to {trained_model_pt_path}\"\
+          )\n\n        #  If the trained model was not saved, raise a ValueError\n\
+          \        if not os.path.exists(trained_model_pt_path):\n            raise\
+          \ ValueError(f\"Model was not saved at {trained_model_pt_path}\")\n\n  \
+          \      # End the run\n        mlflow.end_run()\n\n        # Start the MLflow\
           \ run for validation\n        val_run_name = f\"{run_name}-{model_name}-val-{int(time.time())}\"\
           \n        print(f\"Current run name: {train_run_name}\")\n        with mlflow.start_run(run_name=val_run_name)\
           \ as validation_mlrun:\n            # Validate the model    \n         \
-          \   validation_results = model.val()\n            # print(\"Validation results:\
-          \ \")\n            # print(vars(validation_results))\n\n            if hasattr(validation_results,\
+          \   validation_results = model.val()\n\n            # If the results have\
+          \ the box attribute, log the metrics\n            if hasattr(validation_results,\
           \ 'box'):\n                mlflow.log_metric(\"val/map\", validation_results.box.map)\n\
           \                mlflow.log_metric(\"val/map50\", validation_results.box.map50)\n\
           \                mlflow.log_metric(\"val/map75\", validation_results.box.map75)\n\
@@ -508,18 +517,20 @@ deploymentSpec:
           \                results_output_metrics.log_metric(\"val/mr\", validation_results.box.mr)\n\
           \                results_output_metrics.log_metric(\"val/nc\", validation_results.box.nc)\n\
           \            else:\n                print(\"No box attribute in the results!!!\"\
-          )\n\n        # print(\"Training results: \")\n        # print(vars(results))\n\
-          \n        if not os.path.exists(trained_model_pt_path):\n            raise\
-          \ ValueError(\"Model was not trained\")\n\n        # Save the trained model\
-          \ as pytorch and onnx\n        print(f\"Copying {trained_model_pt_path}\
-          \ to {output_pt_model.path}\")\n        shutil.copy(trained_model_pt_path,\
-          \ output_pt_model.path)\n        print(f\"Copying {trained_model_onnx_path}\
-          \ to {output_onnx_model.path}\")\n        shutil.copy(trained_model_onnx_path,\
-          \ output_onnx_model.path)\n\n    if not training_mlrun:\n        raise ValueError(\"\
-          MLflow run was not started\")\n\n"
+          )\n\n        # Convert the model to ONNX\n        trained_model_onnx_path_tmp\
+          \ = model.export(format=\"onnx\")\n        if not trained_model_onnx_path_tmp:\n\
+          \            print(\"Failed to export model to ONNX format\")\n\n      \
+          \  # Save the onnx model\n        trained_model_onnx_path = os.path.join(models_folder,\
+          \ f\"{trained_model_name}.onnx\")\n        print(f\"Copying {trained_model_onnx_path_tmp}\
+          \ to {trained_model_onnx_path}\")\n        shutil.copy(trained_model_onnx_path_tmp,\
+          \ trained_model_onnx_path)\n        print(f\"Copied {trained_model_onnx_path_tmp}\
+          \ to {trained_model_onnx_path}\")\n\n        # Set the output paths\n  \
+          \      with open(model_name_output, 'w') as f:\n            f.write(trained_model_name)\n\
+          \n    if not training_mlrun:\n        raise ValueError(\"MLflow run was\
+          \ not started\")\n\n"
         env:
         - name: IMAGES_DATASET_S3_KEY
-          value: '{{channel:task=;name=images_dataset_root;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
+          value: '{{channel:task=;name=images_datasets_root_folder;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
         image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
         resources:
           cpuLimit: 6.0
@@ -553,24 +564,29 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef upload_model(\n    input_model_pt: Input[Model],\n    input_model_onnx:\
-          \ Input[Model]\n    ):\n    import os\n    import boto3\n    import botocore\n\
-          \n    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')\n    aws_secret_access_key\
-          \ = os.environ.get('AWS_SECRET_ACCESS_KEY')\n    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n\
-          \    region_name = os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name\
-          \ = os.environ.get('AWS_S3_BUCKET')\n\n    s3_key = os.environ.get(\"MODEL_S3_KEY\"\
-          )\n\n    print(f\"Uploading {input_model_pt.path} and {input_model_onnx.path}\
-          \ to {s3_key} in {bucket_name} bucket in {endpoint_url} endpoint\")\n\n\
-          \    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,\n\
+          \ *\n\ndef upload_model(\n    root_mount_path: str,\n    models_root_folder:\
+          \ str,\n    model_name: str,\n    ):\n    import os\n    import boto3\n\
+          \    import botocore\n\n    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')\n\
+          \    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')\n \
+          \   endpoint_url = os.environ.get('AWS_S3_ENDPOINT')\n    region_name =\
+          \ os.environ.get('AWS_DEFAULT_REGION')\n    bucket_name = os.environ.get('AWS_S3_BUCKET')\n\
+          \n    models_s3_key = os.environ.get(\"MODELS_S3_KEY\")\n\n    # Set the\
+          \ models folder\n    models_folder = os.path.join(root_mount_path, models_root_folder)\n\
+          \n    # Set the model paths for the model.pt and model.onnx\n    model_pt_path\
+          \ = os.path.join(models_folder, f\"{model_name}.pt\")\n    model_onnx_path\
+          \ = os.path.join(models_folder, f\"{model_name}.onnx\")\n\n    print(f\"\
+          Uploading {model_pt_path} and {model_onnx_path} to {models_s3_key} in {bucket_name}\
+          \ bucket in {endpoint_url} endpoint\")\n\n    session = boto3.session.Session(aws_access_key_id=aws_access_key_id,\n\
           \                                    aws_secret_access_key=aws_secret_access_key)\n\
           \n    s3_resource = session.resource(\n        's3',\n        config=botocore.client.Config(signature_version='s3v4'),\n\
           \        endpoint_url=endpoint_url,\n        region_name=region_name)\n\n\
           \    bucket = s3_resource.Bucket(bucket_name)\n\n    print(f\"Uploading\
-          \ {s3_key}\")\n    bucket.upload_file(input_model_pt.path, s3_key)\n   \
-          \ bucket.upload_file(input_model_onnx.path, s3_key)\n\n"
-        env:
-        - name: MODEL_S3_KEY
-          value: models/fraud/1/model.onnx
+          \ to {models_s3_key}\")\n\n    # Upload the model.pt and model.onnx files\
+          \ to the S3 bucket\n    for model_path in [model_pt_path, model_onnx_path]:\n\
+          \        if not os.path.exists(model_path):\n            raise ValueError(f\"\
+          Model file {model_path} does not exist\")\n\n        # Upload the file\n\
+          \        bucket.upload_file(model_path, f\"{models_s3_key}/{os.path.basename(model_path)}\"\
+          )\n\n"
         image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
     exec-yield-not-deployed-error:
       container:
@@ -621,22 +637,19 @@ root:
         - parse-metrics
         - train-model
         inputs:
-          artifacts:
-            pipelinechannel--train-model-output_onnx_model:
-              taskOutputArtifact:
-                outputArtifactKey: output_onnx_model
-                producerTask: train-model
-            pipelinechannel--train-model-output_pt_model:
-              taskOutputArtifact:
-                outputArtifactKey: output_pt_model
-                producerTask: train-model
           parameters:
             pipelinechannel--map75_threshold:
               componentInputParameter: map75_threshold
+            pipelinechannel--models_root_folder:
+              componentInputParameter: models_root_folder
             pipelinechannel--parse-metrics-map75_output:
               taskOutputParameter:
                 outputParameterKey: map75_output
                 producerTask: parse-metrics
+            pipelinechannel--train-model-model_name_output:
+              taskOutputParameter:
+                outputParameterKey: model_name_output
+                producerTask: train-model
         taskInfo:
           name: condition-branches-1
       get-images-dataset:
@@ -651,13 +664,13 @@ root:
               componentInputParameter: force_clean
             images_dataset_name:
               componentInputParameter: images_dataset_name
-            images_dataset_root:
-              componentInputParameter: images_dataset_root
-            images_dataset_volume_mount_path:
-              runtimeValue:
-                constant: /opt/app-root/src/datasets
             images_dataset_yaml:
               componentInputParameter: images_dataset_yaml
+            images_datasets_root_folder:
+              componentInputParameter: images_datasets_root_folder
+            root_mount_path:
+              runtimeValue:
+                constant: /opt/app-root/src
         taskInfo:
           name: get-images-dataset
       parse-metrics:
@@ -683,8 +696,7 @@ root:
             pvc_name:
               componentInputParameter: images_dataset_pvc_name
             size_in_gi:
-              runtimeValue:
-                constant: 1.0
+              componentInputParameter: images_dataset_pvc_size_in_gi
         taskInfo:
           name: setup-storage
       train-model:
@@ -705,15 +717,17 @@ root:
               componentInputParameter: image_size
             images_dataset_name:
               componentInputParameter: images_dataset_name
-            images_dataset_root:
-              componentInputParameter: images_dataset_root
-            images_dataset_volume_mount_path:
-              runtimeValue:
-                constant: /opt/app-root/src/datasets
             images_dataset_yaml:
               componentInputParameter: images_dataset_yaml
+            images_datasets_root_folder:
+              componentInputParameter: images_datasets_root_folder
             model_name:
               componentInputParameter: model_name
+            models_root_folder:
+              componentInputParameter: models_root_folder
+            root_mount_path:
+              runtimeValue:
+                constant: /opt/app-root/src
             run_name:
               componentInputParameter: run_name
             tracking_uri:
@@ -747,19 +761,23 @@ root:
         isOptional: true
         parameterType: NUMBER_INTEGER
       images_dataset_name:
-        defaultValue: uno-cards
+        defaultValue: uno-cards-v1.0
         isOptional: true
         parameterType: STRING
       images_dataset_pvc_name:
         defaultValue: images-datasets-pvc
         isOptional: true
         parameterType: STRING
-      images_dataset_root:
-        defaultValue: datasets
+      images_dataset_pvc_size_in_gi:
+        defaultValue: 5.0
         isOptional: true
-        parameterType: STRING
+        parameterType: NUMBER_INTEGER
       images_dataset_yaml:
         defaultValue: data.yaml
+        isOptional: true
+        parameterType: STRING
+      images_datasets_root_folder:
+        defaultValue: datasets
         isOptional: true
         parameterType: STRING
       map75_threshold:
@@ -768,6 +786,10 @@ root:
         parameterType: NUMBER_DOUBLE
       model_name:
         defaultValue: yolov8n
+        isOptional: true
+        parameterType: STRING
+      models_root_folder:
+        defaultValue: models
         isOptional: true
         parameterType: STRING
       run_name:
@@ -794,7 +816,7 @@ platforms:
         exec-get-images-dataset:
           pvcMount:
           - componentInputParameter: images_dataset_pvc_name
-            mountPath: /opt/app-root/src/datasets
+            mountPath: /opt/app-root/src
           secretAsEnv:
           - keyToEnv:
             - envVar: AWS_ACCESS_KEY_ID
@@ -811,7 +833,7 @@ platforms:
         exec-train-model:
           pvcMount:
           - componentInputParameter: images_dataset_pvc_name
-            mountPath: /opt/app-root/src/datasets
+            mountPath: /opt/app-root/src
           secretAsEnv:
           - keyToEnv:
             - envVar: AWS_ACCESS_KEY_ID
@@ -825,17 +847,3 @@ platforms:
             - envVar: AWS_S3_ENDPOINT
               secretKey: AWS_S3_ENDPOINT
             secretName: aws-connection-datasets
-        exec-upload-model:
-          secretAsEnv:
-          - keyToEnv:
-            - envVar: AWS_ACCESS_KEY_ID
-              secretKey: AWS_ACCESS_KEY_ID
-            - envVar: AWS_SECRET_ACCESS_KEY
-              secretKey: AWS_SECRET_ACCESS_KEY
-            - envVar: AWS_DEFAULT_REGION
-              secretKey: AWS_DEFAULT_REGION
-            - envVar: AWS_S3_BUCKET
-              secretKey: AWS_S3_BUCKET
-            - envVar: AWS_S3_ENDPOINT
-              secretKey: AWS_S3_ENDPOINT
-            secretName: aws-connection-models

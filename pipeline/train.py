@@ -8,7 +8,7 @@ import kfp
 
 from kfp import compiler
 from kfp import dsl
-from kfp.dsl import Input, Output, Dataset, Model, Metrics, OutputPath
+from kfp.dsl import Input, Output, Dataset, Model, Metrics, OutputPath, InputPath
 
 from kfp import kubernetes
 
@@ -118,8 +118,8 @@ def setup_storage(
 
     # Attempt to create the PVC
     try:
-        v1.create_namespaced_persistent_volume_claim(namespace="default", body=pvc_spec)
-        print(f"PVC '{pvc_name}' created successfully.")
+        v1.create_namespaced_persistent_volume_claim(namespace=namespace, body=pvc_spec)
+        print(f"PVC '{pvc_name}' created successfully in namespace '{namespace}'.")
     except ApiException as e:
         raise RuntimeError(f"Failed to create PVC: {e.reason}")
     
@@ -132,17 +132,17 @@ def setup_storage(
 # - AWS_S3_ENDPOINT
 # - SCALER_S3_KEY
 # - EVALUATION_DATA_S3_KEY
-# - MODEL_S3_KEY
+# - MODELS_S3_KEY
 # The data is in pickel format and the file name is passed as an environment variable S3_KEY.
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
     packages_to_install=["boto3", "botocore"]
 )
 def get_images_dataset(
-    images_dataset_root: str, 
+    images_datasets_root_folder: str, 
     images_dataset_name: str,
     images_dataset_yaml: str,
-    images_dataset_volume_mount_path: str,
+    root_mount_path: str,
     force_clean: bool
 ):
     import boto3
@@ -158,7 +158,7 @@ def get_images_dataset(
     bucket_name = os.environ.get('AWS_S3_BUCKET')
 
     # Construct and set the IMAGES_DATASET_S3_KEY environment variable
-    images_dataset_s3_key = f"{images_dataset_root}/{images_dataset_name}.zip"
+    images_dataset_s3_key = f"{images_datasets_root_folder}/{images_dataset_name}.zip"
 
     print(f"images_dataset_s3_key = {images_dataset_s3_key}")
 
@@ -198,21 +198,24 @@ def get_images_dataset(
     bucket.download_file(images_dataset_s3_key, local_file_path)
     print(f"Downloaded {images_dataset_s3_key}")
 
-    # Ensure mount path exists
-    if not os.path.exists(images_dataset_volume_mount_path):
-        os.makedirs(images_dataset_volume_mount_path)
+    # Dataset path
+    images_dataset_path = f"{root_mount_path}/{images_datasets_root_folder}"
 
-    # List the files in the mount path
-    print(f"Listing files in {images_dataset_volume_mount_path}")
-    print(os.listdir(images_dataset_volume_mount_path))
+    # Ensure dataset path exists
+    if not os.path.exists(images_dataset_path):
+        os.makedirs(images_dataset_path)
+
+    # List the files in the dataset path
+    print(f"Listing files in {images_dataset_path}")
+    print(os.listdir(images_dataset_path))
 
     # If we haven't unzipped the file yet or we're forced to, unzip it
-    images_dataset_folder = f"{images_dataset_volume_mount_path}/{images_dataset_name}"
+    images_dataset_folder = f"{images_dataset_path}/{images_dataset_name}"
     if not os.path.exists(images_dataset_folder) or force_clean:
         # Unzip the file into the images dataset volume mount path
-        print(f"Unzipping {local_file_path} to {images_dataset_volume_mount_path}")
-        shutil.unpack_archive(f'{local_file_path}', f'{images_dataset_volume_mount_path}')
-        print(f"Unzipped {local_file_path} to {images_dataset_volume_mount_path}")
+        print(f"Unzipping {local_file_path} to {images_dataset_path}")
+        shutil.unpack_archive(f'{local_file_path}', f'{images_dataset_path}')
+        print(f"Unzipped {local_file_path} to {images_dataset_path}")
 
         # List the files inside images_dataset_folder folder
         print(f"Listing files in {images_dataset_folder}")
@@ -249,11 +252,11 @@ def train_model(
     run_name: str,
     tracking_uri: str,
     images_dataset_name: str,
-    images_dataset_root: str,
+    images_datasets_root_folder: str,
     images_dataset_yaml: str,
-    images_dataset_volume_mount_path: str,
-    output_pt_model: Output[Model],
-    output_onnx_model: Output[Model],
+    models_root_folder: str,
+    root_mount_path: str,
+    model_name_output: OutputPath(str),
     results_output_metrics: Output[Metrics]
 ):
     import os
@@ -271,9 +274,37 @@ def train_model(
     bucket_name = os.environ.get('AWS_S3_BUCKET')
     images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')
 
-    print(f"tracking_uri {tracking_uri}")
-    images_dataset_folder = os.path.join(images_dataset_volume_mount_path, images_dataset_name)
+    print(f"S3: endpoint_url {endpoint_url}")
+    print(f"S3: bucket_name {bucket_name}")
+    print(f"S3: images_dataset_s3_key {images_dataset_s3_key}")
 
+    print(f"tracking_uri {tracking_uri}")
+    print(f"experiment_name {experiment_name}")
+    print(f"images_dataset_name {images_dataset_name}")
+    print(f"images_datasets_root_folder {images_datasets_root_folder}")
+    print(f"images_dataset_yaml {images_dataset_yaml}")
+    print(f"models_root_folder {models_root_folder}")
+    print(f"root_mount_path {root_mount_path}")
+
+    # If root_mount_path is not set or doesn't exist, raise a ValueError
+    if not root_mount_path or not os.path.exists(root_mount_path):
+        raise ValueError(f"Root mount path '{root_mount_path}' does not exist")
+
+    # Set the images dataset folder
+    images_dataset_folder = os.path.join(root_mount_path, images_datasets_root_folder, images_dataset_name)
+
+    # If the images dataset folder doesn't exist, raise a ValueError
+    if not os.path.exists(images_dataset_folder):
+        raise ValueError(f"Images dataset folder {images_dataset_folder} does not exist")
+
+    # Set the models folder
+    models_folder = os.path.join(root_mount_path, models_root_folder)
+
+    # Make sure the models folder exists
+    if not os.path.exists(models_folder):
+        os.makedirs(models_folder)
+
+    # Set the images dataset YAML path
     images_dataset_yaml_path = os.path.join(images_dataset_folder, images_dataset_yaml)
     print(f"Checking if {images_dataset_yaml_path} exists")
     if not os.path.exists(images_dataset_yaml_path):
@@ -311,7 +342,7 @@ def train_model(
     with mlflow.start_run(run_name=train_run_name) as training_mlrun:
         mlflow.log_param("dataset_file", f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}")
         mlflow.log_param("dataset_name", images_dataset_name)
-        mlflow.log_param("dataset_root", images_dataset_root)
+        mlflow.log_param("datasets_root_folder", images_datasets_root_folder)
         mlflow.log_param("dataset_yaml", images_dataset_yaml)
         mlflow.log_param("device", device)
         mlflow.log_param("batch_size", batch_size)
@@ -337,14 +368,18 @@ def train_model(
             print("No box attribute in the results!!!")
 
         # Save the trained model
-        trained_model_pt_path = os.path.join(images_dataset_volume_mount_path, f"model-{train_run_name}.pt")
+        print(f"Saving model to {models_folder}")
+        trained_model_name = f"model-{train_run_name}"
+        print(f"Trained model name: {trained_model_name}")
+        trained_model_pt_path = os.path.join(models_folder, f"{trained_model_name}.pt")
+        print(f"Saving model to {trained_model_pt_path}")
         model.save(trained_model_pt_path)
         print(f"Model saved to {trained_model_pt_path}")
 
-        trained_model_onnx_path = model.export(format="onnx")
-        if not trained_model_onnx_path:
-            print("Failed to export model to ONNX format")
-
+        #  If the trained model was not saved, raise a ValueError
+        if not os.path.exists(trained_model_pt_path):
+            raise ValueError(f"Model was not saved at {trained_model_pt_path}")
+        
         # End the run
         mlflow.end_run()
 
@@ -354,9 +389,8 @@ def train_model(
         with mlflow.start_run(run_name=val_run_name) as validation_mlrun:
             # Validate the model    
             validation_results = model.val()
-            # print("Validation results: ")
-            # print(vars(validation_results))
 
+            # If the results have the box attribute, log the metrics
             if hasattr(validation_results, 'box'):
                 mlflow.log_metric("val/map", validation_results.box.map)
                 mlflow.log_metric("val/map50", validation_results.box.map50)
@@ -373,17 +407,20 @@ def train_model(
             else:
                 print("No box attribute in the results!!!")
             
-        # print("Training results: ")
-        # print(vars(results))
+        # Convert the model to ONNX
+        trained_model_onnx_path_tmp = model.export(format="onnx")
+        if not trained_model_onnx_path_tmp:
+            print("Failed to export model to ONNX format")
 
-        if not os.path.exists(trained_model_pt_path):
-            raise ValueError("Model was not trained")
-    
-        # Save the trained model as pytorch and onnx
-        print(f"Copying {trained_model_pt_path} to {output_pt_model.path}")
-        shutil.copy(trained_model_pt_path, output_pt_model.path)
-        print(f"Copying {trained_model_onnx_path} to {output_onnx_model.path}")
-        shutil.copy(trained_model_onnx_path, output_onnx_model.path)
+        # Save the onnx model
+        trained_model_onnx_path = os.path.join(models_folder, f"{trained_model_name}.onnx")
+        print(f"Copying {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
+        shutil.copy(trained_model_onnx_path_tmp, trained_model_onnx_path)
+        print(f"Copied {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
+
+        # Set the output paths
+        with open(model_name_output, 'w') as f:
+            f.write(trained_model_name)
 
     if not training_mlrun:
         raise ValueError("MLflow run was not started")
@@ -417,8 +454,9 @@ def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)
     packages_to_install=["boto3", "botocore"]
 )
 def upload_model(
-    input_model_pt: Input[Model],
-    input_model_onnx: Input[Model]
+    root_mount_path: str,
+    models_root_folder: str,
+    model_name: str,
     ):
     import os
     import boto3
@@ -430,9 +468,16 @@ def upload_model(
     region_name = os.environ.get('AWS_DEFAULT_REGION')
     bucket_name = os.environ.get('AWS_S3_BUCKET')
 
-    s3_key = os.environ.get("MODEL_S3_KEY")
+    models_s3_key = os.environ.get("MODELS_S3_KEY")
 
-    print(f"Uploading {input_model_pt.path} and {input_model_onnx.path} to {s3_key} in {bucket_name} bucket in {endpoint_url} endpoint")
+    # Set the models folder
+    models_folder = os.path.join(root_mount_path, models_root_folder)
+
+    # Set the model paths for the model.pt and model.onnx
+    model_pt_path = os.path.join(models_folder, f"{model_name}.pt")
+    model_onnx_path = os.path.join(models_folder, f"{model_name}.onnx")
+
+    print(f"Uploading {model_pt_path} and {model_onnx_path} to {models_s3_key} in {bucket_name} bucket in {endpoint_url} endpoint")
 
     session = boto3.session.Session(aws_access_key_id=aws_access_key_id,
                                     aws_secret_access_key=aws_secret_access_key)
@@ -445,9 +490,15 @@ def upload_model(
 
     bucket = s3_resource.Bucket(bucket_name)
 
-    print(f"Uploading {s3_key}")
-    bucket.upload_file(input_model_pt.path, s3_key)
-    bucket.upload_file(input_model_onnx.path, s3_key)
+    print(f"Uploading to {models_s3_key}")
+
+    # Upload the model.pt and model.onnx files to the S3 bucket
+    for model_path in [model_pt_path, model_onnx_path]:
+        if not os.path.exists(model_path):
+            raise ValueError(f"Model file {model_path} does not exist")
+
+        # Upload the file
+        bucket.upload_file(model_path, f"{models_s3_key}/{os.path.basename(model_path)}")
 
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
@@ -510,28 +561,34 @@ def pipeline(
     experiment_name: str = "YOLOv8n",
     run_name: str = "uno-cards",
     tracking_uri: str = "http://mlflow-server:8080",
-    images_dataset_name: str = "uno-cards",
-    images_dataset_root: str = "datasets",
+    images_dataset_name: str = "uno-cards-v1.0",
+    images_datasets_root_folder: str = "datasets",
     images_dataset_yaml: str = "data.yaml",
     images_dataset_pvc_name: str = "images-datasets-pvc",
+    images_dataset_pvc_size_in_gi: int = 5,
+    models_root_folder: str = "models",
     force_clean: bool = False,
     enable_caching: bool = False):
 
+    # Define the root mount path
+    root_mount_path = '/opt/app-root/src'
+
     # Define the datasets volume
     datasets_pvc_name = images_dataset_pvc_name
-    dataset_volume_mount_path = '/opt/app-root/src/datasets'
+    datasets_pvc_size_in_gi = images_dataset_pvc_size_in_gi
+    datasets_volume_mount_path = f"{root_mount_path}/{images_datasets_root_folder}"
 
     setup_storage_task = setup_storage(
-        pvc_name=datasets_pvc_name, size_in_gi=1
+        pvc_name=datasets_pvc_name, size_in_gi=datasets_pvc_size_in_gi
     ).set_caching_options(False)
 
     # Get the dataset
     force_dataset_path_clean = force_clean
     get_images_dataset_task = get_images_dataset(
-        images_dataset_root=images_dataset_root,
+        images_datasets_root_folder=images_datasets_root_folder,
         images_dataset_name=images_dataset_name,
         images_dataset_yaml=images_dataset_yaml,
-        images_dataset_volume_mount_path=dataset_volume_mount_path,
+        root_mount_path=root_mount_path,
         force_clean=force_dataset_path_clean
     ).set_caching_options(False)
     get_images_dataset_task.after(setup_storage_task)
@@ -540,7 +597,7 @@ def pipeline(
     kubernetes.mount_pvc(
         get_images_dataset_task,
         pvc_name=datasets_pvc_name,
-        mount_path='/opt/app-root/src/datasets',
+        mount_path=root_mount_path,
     )
 
     # Train the model
@@ -553,9 +610,10 @@ def pipeline(
         run_name=run_name,
         tracking_uri=tracking_uri,
         images_dataset_name=images_dataset_name,
-        images_dataset_root=images_dataset_root,
+        images_datasets_root_folder=images_datasets_root_folder,
         images_dataset_yaml=images_dataset_yaml,
-        images_dataset_volume_mount_path=dataset_volume_mount_path
+        models_root_folder=models_root_folder,
+        root_mount_path=root_mount_path
     ).set_caching_options(False)
     train_model_task.after(get_images_dataset_task)
     train_model_task.set_memory_request("6Gi")
@@ -564,27 +622,38 @@ def pipeline(
     train_model_task.set_cpu_limit("6")
     # train_model_task.set_accelerator_type("nvidia.com/gpu.product")
     
+    # Extract model name
+    model_name = train_model_task.outputs["model_name_output"]
+
     # Mount the PVC to the task 
     kubernetes.mount_pvc(
         train_model_task,
         pvc_name=datasets_pvc_name,
-        mount_path='/opt/app-root/src/datasets',
+        mount_path=root_mount_path,
     )
 
-    # Parse the metrics and extract the accuracy
+    # Parse the metrics and extract the mean average precision at 75
     parse_metrics_task = parse_metrics(metrics_input=train_model_task.outputs["results_output_metrics"]).set_caching_options(False)
     map75 = parse_metrics_task.outputs["map75_output"]
 
-    # Use the parsed accuracy to decide if we should upload the model
+    # Use the parsed mean average precision at 75 to decide if we should upload the model
     # Doc: https://www.kubeflow.org/docs/components/pipelines/user-guides/core-functions/execute-kfp-pipelines-locally/
     with dsl.If(map75 >= map75_threshold):
         upload_model_task = upload_model(
-            input_model_pt=train_model_task.outputs["output_pt_model"],
-            input_model_onnx=train_model_task.outputs["output_onnx_model"]
+            root_mount_path=root_mount_path,
+            models_root_folder=models_root_folder,
+            model_name=model_name
         ).after(parse_metrics_task).set_caching_options(False)
 
+        # Mount the PVC to the task 
+        kubernetes.mount_pvc(
+            upload_model_task,
+            pvc_name=datasets_pvc_name,
+            mount_path=root_mount_path,
+        )
+
         # Setting environment variables for upload_model_task
-        upload_model_task.set_env_variable(name="MODEL_S3_KEY", value="models/fraud/1/model.onnx")
+        upload_model_task.set_env_variable(name="MODELS_S3_KEY", value="models/yolo/")
         kubernetes.use_secret_as_env(
             task=upload_model_task,
             secret_name=MODELS_CONNECTION_SECRET,
@@ -596,18 +665,17 @@ def pipeline(
                 'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
             }
         )
-
+        
         # Refresh the deployment
         # refresh_deployment(deployment_name=deployment_name).after(upload_model_task).set_caching_options(False)
     with dsl.Else():
         yield_not_deployed_error().set_caching_options(False)
 
     # Define the IMAGES_DATASET_S3_KEY value
-    images_dataset_s3_key = f"{images_dataset_root}/{images_dataset_name}.zip"
+    images_dataset_s3_key = f"{images_datasets_root_folder}/{images_dataset_name}.zip"
 
     # Set the S3 keys for get_images_dataset_task and kubernetes secret to be used in the task
     get_images_dataset_task.set_env_variable(name="IMAGES_DATASET_S3_KEY", value=images_dataset_s3_key)
-
     kubernetes.use_secret_as_env(
         task=get_images_dataset_task,
         secret_name=DATASETS_CONNECTION_SECRET,
