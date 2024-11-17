@@ -1,0 +1,11 @@
+apiVersion: v2
+name: pipelines
+description: A Helm chart to deploy a Yolo trainer pipeline using RHOAI
+version: 0.1.0
+appVersion: "1.0"
+dependencies:
+  - name: "mlflow-server"
+    version: "0.7.1"
+    repository: "https://strangiato.github.io/helm-charts/"
+    condition: mlflow-server.enabled
+    

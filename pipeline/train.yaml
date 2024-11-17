@@ -20,94 +20,6 @@
 # Outputs:
 #    train-model-results_output_metrics: system.Metrics
 components:
-  comp-condition-2:
-    dag:
-      tasks:
-        upload-model:
-          cachingOptions: {}
-          componentRef:
-            name: comp-upload-model
-          inputs:
-            parameters:
-              model_name:
-                componentInputParameter: pipelinechannel--train-model-model_name_output
-              models_root_folder:
-                componentInputParameter: pipelinechannel--models_root_folder
-              root_mount_path:
-                runtimeValue:
-                  constant: /opt/app-root/src
-          taskInfo:
-            name: upload-model
-    inputDefinitions:
-      parameters:
-        pipelinechannel--map75_threshold:
-          parameterType: NUMBER_DOUBLE
-        pipelinechannel--models_root_folder:
-          parameterType: STRING
-        pipelinechannel--parse-metrics-map75_output:
-          parameterType: NUMBER_DOUBLE
-        pipelinechannel--train-model-model_name_output:
-          parameterType: STRING
-  comp-condition-3:
-    dag:
-      tasks:
-        yield-not-deployed-error:
-          cachingOptions: {}
-          componentRef:
-            name: comp-yield-not-deployed-error
-          taskInfo:
-            name: yield-not-deployed-error
-    inputDefinitions:
-      parameters:
-        pipelinechannel--map75_threshold:
-          parameterType: NUMBER_DOUBLE
-        pipelinechannel--parse-metrics-map75_output:
-          parameterType: NUMBER_DOUBLE
-  comp-condition-branches-1:
-    dag:
-      tasks:
-        condition-2:
-          componentRef:
-            name: comp-condition-2
-          inputs:
-            parameters:
-              pipelinechannel--map75_threshold:
-                componentInputParameter: pipelinechannel--map75_threshold
-              pipelinechannel--models_root_folder:
-                componentInputParameter: pipelinechannel--models_root_folder
-              pipelinechannel--parse-metrics-map75_output:
-                componentInputParameter: pipelinechannel--parse-metrics-map75_output
-              pipelinechannel--train-model-model_name_output:
-                componentInputParameter: pipelinechannel--train-model-model_name_output
-          taskInfo:
-            name: condition-2
-          triggerPolicy:
-            condition: inputs.parameter_values['pipelinechannel--parse-metrics-map75_output']
-              >= inputs.parameter_values['pipelinechannel--map75_threshold']
-        condition-3:
-          componentRef:
-            name: comp-condition-3
-          inputs:
-            parameters:
-              pipelinechannel--map75_threshold:
-                componentInputParameter: pipelinechannel--map75_threshold
-              pipelinechannel--parse-metrics-map75_output:
-                componentInputParameter: pipelinechannel--parse-metrics-map75_output
-          taskInfo:
-            name: condition-3
-          triggerPolicy:
-            condition: '!(inputs.parameter_values[''pipelinechannel--parse-metrics-map75_output'']
-              >= inputs.parameter_values[''pipelinechannel--map75_threshold''])'
-    inputDefinitions:
-      parameters:
-        pipelinechannel--map75_threshold:
-          parameterType: NUMBER_DOUBLE
-        pipelinechannel--models_root_folder:
-          parameterType: STRING
-        pipelinechannel--parse-metrics-map75_output:
-          parameterType: NUMBER_DOUBLE
-        pipelinechannel--train-model-model_name_output:
-          parameterType: STRING
   comp-get-images-dataset:
     executorLabel: exec-get-images-dataset
     inputDefinitions:
@@ -122,18 +34,6 @@ components:
           parameterType: STRING
         root_mount_path:
           parameterType: STRING
-  comp-parse-metrics:
-    executorLabel: exec-parse-metrics
-    inputDefinitions:
-      artifacts:
-        metrics_input:
-          artifactType:
-            schemaTitle: system.Metrics
-            schemaVersion: 0.0.1
-    outputDefinitions:
-      parameters:
-        map75_output:
-          parameterType: NUMBER_DOUBLE
   comp-setup-storage:
     executorLabel: exec-setup-storage
     inputDefinitions:
@@ -200,8 +100,17 @@ components:
           parameterType: STRING
         root_mount_path:
           parameterType: STRING
-  comp-yield-not-deployed-error:
-    executorLabel: exec-yield-not-deployed-error
+  comp-validate-metrics:
+    executorLabel: exec-validate-metrics
+    inputDefinitions:
+      artifacts:
+        metrics_input:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        thresholds:
+          parameterType: STRUCT
 deploymentSpec:
   executors:
     exec-get-images-dataset:
@@ -286,38 +195,7 @@ deploymentSpec:
         env:
         - name: IMAGES_DATASET_S3_KEY
           value: '{{channel:task=;name=images_datasets_root_folder;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
-    exec-parse-metrics:
-      container:
-        args:
-        - --executor_input
-        - '{{$}}'
-        - --function_to_execute
-        - parse_metrics
-        command:
-        - sh
-        - -c
-        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
-          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
-          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
-          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
-          $0\" \"$@\"\n"
-        - sh
-        - -ec
-        - 'program_path=$(mktemp -d)
-
-
-          printf "%s" "$0" > "$program_path/ephemeral_component.py"
-
-          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
-
-          '
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)):\n\
-          \    print(f\"metrics_input: {dir(metrics_input)}\")\n    map75 = metrics_input.metadata[\"\
-          val/map75\"]\n\n    with open(map75_output, 'w') as f:\n        f.write(str(map75))\n\
-          \n"
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
     exec-setup-storage:
       container:
         args:
@@ -396,7 +274,7 @@ deploymentSpec:
           \ body=pvc_spec)\n        print(f\"PVC '{pvc_name}' created successfully\
           \ in namespace '{namespace}'.\")\n    except ApiException as e:\n      \
           \  raise RuntimeError(f\"Failed to create PVC: {e.reason}\")\n\n"
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
     exec-train-model:
       container:
         args:
@@ -531,7 +409,7 @@ deploymentSpec:
         env:
         - name: IMAGES_DATASET_S3_KEY
           value: '{{channel:task=;name=images_datasets_root_folder;type=String;}}/{{channel:task=;name=images_dataset_name;type=String;}}.zip'
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
         resources:
           cpuLimit: 6.0
           cpuRequest: 4.0
@@ -585,16 +463,20 @@ deploymentSpec:
           \ to the S3 bucket\n    for model_path in [model_pt_path, model_onnx_path]:\n\
           \        if not os.path.exists(model_path):\n            raise ValueError(f\"\
           Model file {model_path} does not exist\")\n\n        # Upload the file\n\
-          \        bucket.upload_file(model_path, f\"{models_s3_key}/{os.path.basename(model_path)}\"\
+          \        print(f\"Uploading {model_path} to {models_s3_key}/{os.path.basename(model_path)}\"\
+          )\n        bucket.upload_file(model_path, f\"{models_s3_key}/{os.path.basename(model_path)}\"\
           )\n\n"
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
-    exec-yield-not-deployed-error:
+        env:
+        - name: MODELS_S3_KEY
+          value: models/yolo
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
+    exec-validate-metrics:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - yield_not_deployed_error
+        - validate_metrics
         command:
         - sh
         - -c
@@ -616,9 +498,18 @@ deploymentSpec:
 
           '
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
-          \ *\n\ndef yield_not_deployed_error():\n    raise ValueError(\"Model not\
-          \ deployed\")\n\n"
-        image: quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301
+          \ *\n\ndef validate_metrics(thresholds: Dict[str, float], metrics_input:\
+          \ Input[Metrics]):\n    print(f\"thresholds: {thresholds}\")\n\n    # For\
+          \ each threshold, check if the metric is above the threshold\n    for metric_name,\
+          \ threshold in thresholds.items():\n        print(f\"metric_name: {metric_name},\
+          \ threshold: {threshold}\")\n        metric_value = float(metrics_input.metadata[metric_name])\n\
+          \        print(f\"metric_value: {metric_value}\")\n        # Make sure metric_value\
+          \ and threshold are floats\n        metric_value = float(metric_value)\n\
+          \        threshold = float(threshold)\n        # If the metric is below\
+          \ the threshold, raise a ValueError\n        if metric_value <= threshold:\n\
+          \            raise ValueError(f\"{metric_name} is below the threshold of\
+          \ {threshold}\")\n\n"
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
 pipelineInfo:
   name: train
 root:
@@ -630,28 +521,6 @@ root:
           - outputArtifactKey: results_output_metrics
             producerSubtask: train-model
     tasks:
-      condition-branches-1:
-        componentRef:
-          name: comp-condition-branches-1
-        dependentTasks:
-        - parse-metrics
-        - train-model
-        inputs:
-          parameters:
-            pipelinechannel--map75_threshold:
-              componentInputParameter: map75_threshold
-            pipelinechannel--models_root_folder:
-              componentInputParameter: models_root_folder
-            pipelinechannel--parse-metrics-map75_output:
-              taskOutputParameter:
-                outputParameterKey: map75_output
-                producerTask: parse-metrics
-            pipelinechannel--train-model-model_name_output:
-              taskOutputParameter:
-                outputParameterKey: model_name_output
-                producerTask: train-model
-        taskInfo:
-          name: condition-branches-1
       get-images-dataset:
         cachingOptions: {}
         componentRef:
@@ -673,20 +542,6 @@ root:
                 constant: /opt/app-root/src
         taskInfo:
           name: get-images-dataset
-      parse-metrics:
-        cachingOptions: {}
-        componentRef:
-          name: comp-parse-metrics
-        dependentTasks:
-        - train-model
-        inputs:
-          artifacts:
-            metrics_input:
-              taskOutputArtifact:
-                outputArtifactKey: results_output_metrics
-                producerTask: train-model
-        taskInfo:
-          name: parse-metrics
       setup-storage:
         cachingOptions: {}
         componentRef:
@@ -734,6 +589,47 @@ root:
               componentInputParameter: tracking_uri
         taskInfo:
           name: train-model
+      upload-model:
+        cachingOptions: {}
+        componentRef:
+          name: comp-upload-model
+        dependentTasks:
+        - train-model
+        - validate-metrics
+        inputs:
+          parameters:
+            model_name:
+              taskOutputParameter:
+                outputParameterKey: model_name_output
+                producerTask: train-model
+            models_root_folder:
+              componentInputParameter: models_root_folder
+            root_mount_path:
+              runtimeValue:
+                constant: /opt/app-root/src
+        taskInfo:
+          name: upload-model
+      validate-metrics:
+        cachingOptions: {}
+        componentRef:
+          name: comp-validate-metrics
+        dependentTasks:
+        - train-model
+        inputs:
+          artifacts:
+            metrics_input:
+              taskOutputArtifact:
+                outputArtifactKey: results_output_metrics
+                producerTask: train-model
+          parameters:
+            pipelinechannel--map75_threshold:
+              componentInputParameter: map75_threshold
+            thresholds:
+              runtimeValue:
+                constant:
+                  val/map75: '{{$.inputs.parameters[''pipelinechannel--map75_threshold'']}}'
+        taskInfo:
+          name: validate-metrics
   inputDefinitions:
     parameters:
       batch_size:
@@ -847,3 +743,20 @@ platforms:
             - envVar: AWS_S3_ENDPOINT
               secretKey: AWS_S3_ENDPOINT
             secretName: aws-connection-datasets
+        exec-upload-model:
+          pvcMount:
+          - componentInputParameter: images_dataset_pvc_name
+            mountPath: /opt/app-root/src
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            secretName: aws-connection-models

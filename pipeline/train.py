@@ -1,14 +1,15 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
 import os
-from pyexpat import model
 import sys
+
+from typing import Dict
 
 import kfp
 
 from kfp import compiler
 from kfp import dsl
-from kfp.dsl import Input, Output, Dataset, Model, Metrics, OutputPath, InputPath
+from kfp.dsl import Input, Output, Metrics, OutputPath
 
 from kfp import kubernetes
 
@@ -20,7 +21,8 @@ MODELS_CONNECTION_SECRET = "aws-connection-models"
 # This component creates a PersistentVolumeClaim (PVC) in the current namespace with the specified size, 
 # access mode and storage class
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["kubernetes==23.6.0"]
 )
 def setup_storage(
@@ -135,7 +137,8 @@ def setup_storage(
 # - MODELS_S3_KEY
 # The data is in pickel format and the file name is passed as an environment variable S3_KEY.
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["boto3", "botocore"]
 )
 def get_images_dataset(
@@ -240,7 +243,8 @@ def get_images_dataset(
             f.write(data)
 
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["ultralytics==8.3.22", "load_dotenv==0.1.0", "numpy==1.26.4", "mlflow==2.17.1", "onnxruntime==1.19.2", "onnxslim==0.1.36"]
 )
 def train_model(
@@ -425,8 +429,30 @@ def train_model(
     if not training_mlrun:
         raise ValueError("MLflow run was not started")
 
+# Component to validate the metrics. It receives a list of tuples with the metric name and the threshold and the metrics as input.
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
+    packages_to_install=["onnx==1.16.1", "onnxruntime==1.18.0", "scikit-learn==1.5.0", "numpy==1.24.3", "pandas==2.2.2"]
+)
+def validate_metrics(thresholds: Dict[str, float], metrics_input: Input[Metrics]):
+    print(f"thresholds: {thresholds}")
+
+    # For each threshold, check if the metric is above the threshold
+    for metric_name, threshold in thresholds.items():
+        print(f"metric_name: {metric_name}, threshold: {threshold}")
+        metric_value = float(metrics_input.metadata[metric_name])
+        print(f"metric_value: {metric_value}")
+        # Make sure metric_value and threshold are floats
+        metric_value = float(metric_value)
+        threshold = float(threshold)
+        # If the metric is below the threshold, raise a ValueError
+        if metric_value <= threshold:
+            raise ValueError(f"{metric_name} is below the threshold of {threshold}")
+
+@dsl.component(
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["onnx==1.16.1", "onnxruntime==1.18.0", "scikit-learn==1.5.0", "numpy==1.24.3", "pandas==2.2.2"]
 )
 def yield_not_deployed_error():
@@ -450,7 +476,8 @@ def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)
 # - AWS_S3_BUCKET
 # - AWS_S3_ENDPOINT
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["boto3", "botocore"]
 )
 def upload_model(
@@ -498,10 +525,12 @@ def upload_model(
             raise ValueError(f"Model file {model_path} does not exist")
 
         # Upload the file
+        print(f"Uploading {model_path} to {models_s3_key}/{os.path.basename(model_path)}")
         bucket.upload_file(model_path, f"{models_s3_key}/{os.path.basename(model_path)}")
 
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
     packages_to_install=["kubernetes"]
 )
 def refresh_deployment(deployment_name: str):
@@ -576,7 +605,6 @@ def pipeline(
     # Define the datasets volume
     datasets_pvc_name = images_dataset_pvc_name
     datasets_pvc_size_in_gi = images_dataset_pvc_size_in_gi
-    datasets_volume_mount_path = f"{root_mount_path}/{images_datasets_root_folder}"
 
     setup_storage_task = setup_storage(
         pvc_name=datasets_pvc_name, size_in_gi=datasets_pvc_size_in_gi
@@ -592,13 +620,6 @@ def pipeline(
         force_clean=force_dataset_path_clean
     ).set_caching_options(False)
     get_images_dataset_task.after(setup_storage_task)
-
-    # Mount the PVC to the task 
-    kubernetes.mount_pvc(
-        get_images_dataset_task,
-        pvc_name=datasets_pvc_name,
-        mount_path=root_mount_path,
-    )
 
     # Train the model
     train_model_task = train_model(
@@ -620,56 +641,62 @@ def pipeline(
     train_model_task.set_cpu_request("4")
     train_model_task.set_memory_limit("8Gi")
     train_model_task.set_cpu_limit("6")
-    # train_model_task.set_accelerator_type("nvidia.com/gpu.product")
-    
+    # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
+    # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
+    # kubernetes.add_node_selector(
+    #     train_model_task,
+    #     label_key='nvidia.com/gpu.product',
+    #     label_value='NVIDIA-A10G'
+    # )
+    # kubernetes.add_toleration(
+    #     train_model_task,
+    #     key='nvidia.com/gpu',
+    #     operator='Exists',
+    #     effect='NoSchedule'
+    # )
+
     # Extract model name
     model_name = train_model_task.outputs["model_name_output"]
 
+    # Validate the metrics, if metrics are below the threshold, the pipeline will fail
+    # thresholds is a Dict[str, float] with the metric name and the threshold
+    thresholds = {
+        "val/map75": map75_threshold
+    }
+    validate_metrics_task = validate_metrics(
+        thresholds=thresholds,
+        metrics_input=train_model_task.outputs["results_output_metrics"]
+    ).set_caching_options(False)
+
+    # Upload the model
+    upload_model_task = upload_model(
+        root_mount_path=root_mount_path,
+        models_root_folder=models_root_folder,
+        model_name=model_name
+    ).after(validate_metrics_task).set_caching_options(False)
+
     # Mount the PVC to the task 
     kubernetes.mount_pvc(
-        train_model_task,
+        upload_model_task,
         pvc_name=datasets_pvc_name,
         mount_path=root_mount_path,
     )
 
-    # Parse the metrics and extract the mean average precision at 75
-    parse_metrics_task = parse_metrics(metrics_input=train_model_task.outputs["results_output_metrics"]).set_caching_options(False)
-    map75 = parse_metrics_task.outputs["map75_output"]
+    # Setting environment variables for upload_model_task
+    upload_model_task.set_env_variable(name="MODELS_S3_KEY", value="models/yolo")
+    kubernetes.use_secret_as_env(
+        task=upload_model_task,
+        secret_name=MODELS_CONNECTION_SECRET,
+        secret_key_to_env={
+            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
+            'AWS_DEFAULT_REGION': 'AWS_DEFAULT_REGION',
+            'AWS_S3_BUCKET': 'AWS_S3_BUCKET',
+            'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
+        }
+    )
 
-    # Use the parsed mean average precision at 75 to decide if we should upload the model
-    # Doc: https://www.kubeflow.org/docs/components/pipelines/user-guides/core-functions/execute-kfp-pipelines-locally/
-    with dsl.If(map75 >= map75_threshold):
-        upload_model_task = upload_model(
-            root_mount_path=root_mount_path,
-            models_root_folder=models_root_folder,
-            model_name=model_name
-        ).after(parse_metrics_task).set_caching_options(False)
-
-        # Mount the PVC to the task 
-        kubernetes.mount_pvc(
-            upload_model_task,
-            pvc_name=datasets_pvc_name,
-            mount_path=root_mount_path,
-        )
-
-        # Setting environment variables for upload_model_task
-        upload_model_task.set_env_variable(name="MODELS_S3_KEY", value="models/yolo/")
-        kubernetes.use_secret_as_env(
-            task=upload_model_task,
-            secret_name=MODELS_CONNECTION_SECRET,
-            secret_key_to_env={
-                'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
-                'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
-                'AWS_DEFAULT_REGION': 'AWS_DEFAULT_REGION',
-                'AWS_S3_BUCKET': 'AWS_S3_BUCKET',
-                'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
-            }
-        )
-        
-        # Refresh the deployment
-        # refresh_deployment(deployment_name=deployment_name).after(upload_model_task).set_caching_options(False)
-    with dsl.Else():
-        yield_not_deployed_error().set_caching_options(False)
+    ## Prepare environment variables and PVC mounts for get_images_dataset_task
 
     # Define the IMAGES_DATASET_S3_KEY value
     images_dataset_s3_key = f"{images_datasets_root_folder}/{images_dataset_name}.zip"
@@ -688,9 +715,17 @@ def pipeline(
         }
     )
 
+    # Mount the PVC to the task 
+    kubernetes.mount_pvc(
+        get_images_dataset_task,
+        pvc_name=datasets_pvc_name,
+        mount_path=root_mount_path,
+    )
+
+    ## Prepare environment variables and PVC mounts for train_model_task
+
     # Set the S3 keys for train_model and kubernetes secret to be used in the task
     train_model_task.set_env_variable(name="IMAGES_DATASET_S3_KEY", value=images_dataset_s3_key)
-
     kubernetes.use_secret_as_env(
         task=train_model_task,
         secret_name=DATASETS_CONNECTION_SECRET,
@@ -702,6 +737,23 @@ def pipeline(
             'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
         }
     )
+
+    kubernetes.mount_pvc(
+        train_model_task,
+        pvc_name=datasets_pvc_name,
+        mount_path=root_mount_path,
+    )
+
+    # This needs an upcoming version of the RHOAI pipelines
+    # # Mount the PVC to the task 
+    # kubernetes.empty_dir_mount(
+    #     train_model_task,
+    #     volume_name='shm',
+    #     mount_path='/dev/shm',
+    #     medium='Memory',
+    #     size_limit='2Gi'
+    # )
+
 
 def get_pipeline_by_name(client: kfp.Client, pipeline_name: str):
     import json

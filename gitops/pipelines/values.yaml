@@ -1,0 +1,39 @@
+vcs:
+  uri: https://github.com/alpha-hack-program/yolo-uno-cards.git
+  ref: main
+  name: alpha-hack-program/yolo-uno-cards
+
+gitSslVerify: true
+
+# dataScienceProjectDisplayName: yolo-uno-cards
+# dataScienceProjectNamespace: yolo-uno-cards
+
+# instanceName: yolo-uno-cards
+
+createNamespace: true
+
+kfpUpsertTektonPipelineName: kfp-upsert-pl
+
+pipelinesWorkspaceDefaultSize: 2Gi
+
+# pipelines:
+#   connection:
+#     name: pipelines
+#     displayName: pipelines
+#     type: s3
+#     scheme: http
+#     awsAccessKeyId: minio
+#     awsSecretAccessKey: minio123
+#     awsDefaultRegion: none
+#     awsS3Bucket: pipelines
+#     awsS3Endpoint: minio.ic-shared-minio.svc:9000
+
+pythonImage:
+  version: "3.9"
+  name: "python"
+  tag: "3.9-ubi8"
+
+mountCaCerts: "false"
+
+setup:
+  image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest

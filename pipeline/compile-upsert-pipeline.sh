@@ -15,6 +15,10 @@ TOKEN=$(oc whoami -t)
 # If TOKEN is empty print error and exit
 if [ -z "$TOKEN" ]; then
   echo "Error: No token found. Please login to OpenShift using 'oc login' command."
+  echo "Compile only mode."
+
+  python train.py
+
   exit 1
 fi
 

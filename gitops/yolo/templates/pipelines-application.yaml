@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.instanceName }}-pipelines
+  namespace: openshift-gitops
+spec:
+  project: default
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: {{ .Values.namespace }}
+  source:
+    path: gitops/pipelines
+    repoURL: https://github.com/alpha-hack-program/yolo-uno-cards.git
+    targetRevision: main
+    helm:
+      parameters:
+        - name: instanceName
+          value: "{{ .Values.instanceName }}"
+        - name: dataScienceProjectNamespace
+          value: "{{ .Values.namespace }}"
+        - name: dataScienceProjectDisplayName
+          value: "{{ .Values.namespace }}"
+        - name: mountCaCerts
+          value: "{{ .Values.mountCaCerts }}"
+        - name: pipelines.connection.name
+          value: "{{ .Values.pipelines.connection.name }}"
+        - name: pipelines.connection.displayName
+          value: "{{ .Values.pipelines.connection.displayName }}"
+        - name: pipelines.connection.type
+          value: "{{ .Values.pipelines.connection.type }}"
+        - name: pipelines.connection.scheme
+          value: "{{ .Values.pipelines.connection.scheme }}"
+        - name: pipelines.connection.awsAccessKeyId
+          value: "{{ .Values.pipelines.connection.awsAccessKeyId }}"
+        - name: pipelines.connection.awsSecretAccessKey
+          value: "{{ .Values.pipelines.connection.awsSecretAccessKey }}"
+        - name: pipelines.connection.awsDefaultRegion
+          value: "{{ .Values.pipelines.connection.awsDefaultRegion }}"
+        - name: pipelines.connection.awsS3Bucket
+          value: "{{ .Values.pipelines.connection.awsS3Bucket }}"
+        - name: pipelines.connection.awsS3Endpoint
+          value: "{{ .Values.pipelines.connection.awsS3Endpoint }}"
+  syncPolicy:
+    automated:
+      # prune: true
+      selfHeal: true

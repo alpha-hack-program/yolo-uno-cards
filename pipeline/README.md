@@ -119,7 +119,7 @@ version: 0.1.0
 appVersion: "1.16.0"
 
 dependencies:
-  - name: "odh"
+  - name: "mlflow"
     version: "0.1.3"
     repository: "https://strangiato.github.io/helm-charts/"
 ```
