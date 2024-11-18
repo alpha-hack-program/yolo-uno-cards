@@ -14,6 +14,8 @@ spec:
     targetRevision: main
     helm:
       parameters:
+        - name: createNamespace
+          value: "false" # This is set to false because the namespace is created by the yolo application
         - name: instanceName
           value: "{{ .Values.instanceName }}"
         - name: dataScienceProjectNamespace
