@@ -1,6 +1,0 @@
-dependencies:
-- name: mlflow-server
-  repository: https://strangiato.github.io/helm-charts/
-  version: 0.7.1
-digest: sha256:8bb6d0db78f39bf5dfd8c0be2d8bb03996059352589c1d3e2fc45bafc383ecd1
-generated: "2024-11-16T17:04:59.554418+01:00"
