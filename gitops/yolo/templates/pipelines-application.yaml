@@ -30,6 +30,8 @@ spec:
           value: "{{ .Values.namespace }}"
         - name: mountCaCerts
           value: "{{ .Values.mountCaCerts }}"
+        - name: pipelinesServiceAccountName
+          value: "{{ .Values.pipelinesServiceAccountName }}"
         - name: pipelines.connection.name
           value: "{{ .Values.pipelines.connection.name }}"
         - name: pipelines.connection.displayName

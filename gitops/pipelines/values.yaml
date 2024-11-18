@@ -16,6 +16,8 @@ kfpUpsertTektonPipelineName: kfp-upsert-pl
 
 pipelinesWorkspaceDefaultSize: 2Gi
 
+pipelinesServiceAccountName: build-bot-sa
+
 # pipelines:
 #   connection:
 #     name: pipelines

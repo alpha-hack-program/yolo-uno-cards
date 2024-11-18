@@ -2,10 +2,14 @@
 ARGOCD_APP_NAME=pipelines
 
 # Load environment variables
+REPO_URL="uri: https://github.com/alpha-hack-program/yolo-uno-cards.git"
+TARGET_REVISION="fb-mount"
 INSTANCE_NAME="yolo-uno-cards"
 DATA_SCIENCE_PROJECT_NAMESPACE="yolo"
 
 helm template . --name-template ${ARGOCD_APP_NAME} \
+  --set vcs.url="${REPO_URL}" \
+  --set vcs.ref="${TARGET_REVISION}" \
   --set instanceName="${INSTANCE_NAME}" \
   --set dataScienceProjectNamespace=${DATA_SCIENCE_PROJECT_NAMESPACE} \
   --set dataScienceProjectDisplayName=${DATA_SCIENCE_PROJECT_NAMESPACE} \
