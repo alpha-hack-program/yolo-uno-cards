@@ -10,10 +10,16 @@ spec:
     namespace: {{ .Values.argocdNamespace }}
   source:
     path: gitops/pipelines
-    repoURL: https://github.com/alpha-hack-program/yolo-uno-cards.git
-    targetRevision: main
+    repoURL: {{ .Values.vcs.uri }}
+    targetRevision: {{ .Values.vcs.ref }}
     helm:
       parameters:
+        - name: gitSslVerify
+          value: "{{ .Values.gitSslVerify }}"
+        - name: vcs.uri
+          value: "{{ .Values.vcs.uri }}"
+        - name: vcs.ref
+          value: "{{ .Values.vcs.ref }}"
         - name: createNamespace
           value: "false" # This is set to false because the namespace is created by the yolo application
         - name: instanceName
