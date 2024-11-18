@@ -7,7 +7,7 @@ spec:
   project: default
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: {{ .Values.namespace }}
+    namespace: {{ .Values.argocdNamespace }}
   source:
     path: gitops/pipelines
     repoURL: https://github.com/alpha-hack-program/yolo-uno-cards.git

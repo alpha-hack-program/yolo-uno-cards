@@ -7,9 +7,11 @@ gitSslVerify: true
 
 pipelinesServiceAccountName: build-bot-sa
 
-namespace: yolo-uno-cards
+argocdNamespace: openshift-gitops
 
-instanceName: vllm-mistral-7b
+namespace: yolo
+
+instanceName: yolo
 
 createNamespace: true
 

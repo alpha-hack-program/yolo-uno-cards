@@ -4,7 +4,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: yolo-pipelines
+  name: yolo-uno-cards
   namespace: openshift-gitops
 spec:
   project: default
@@ -12,7 +12,7 @@ spec:
     server: 'https://kubernetes.default.svc'
     namespace: yolo-uno-cards
   source:
-    path: gitops/pipelines
+    path: gitops/yolo
     repoURL: https://github.com/alpha-hack-program/yolo-uno-cards.git
     targetRevision: main
     helm:
