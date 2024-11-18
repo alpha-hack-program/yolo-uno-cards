@@ -9,7 +9,8 @@ pipelinesServiceAccountName: build-bot-sa
 
 argocdNamespace: openshift-gitops
 
-namespace: yolo
+dataScienceProjectNamespace: yolo
+dataScienceProjectDisplayName: yolo
 
 instanceName: yolo
 
