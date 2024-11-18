@@ -25,9 +25,9 @@ spec:
         - name: instanceName
           value: "{{ .Values.instanceName }}"
         - name: dataScienceProjectNamespace
-          value: "{{ .Values.namespace }}"
+          value: "{{ .Values.dataScienceProjectNamespace }}"
         - name: dataScienceProjectDisplayName
-          value: "{{ .Values.namespace }}"
+          value: "{{ .Values.dataScienceProjectDisplayName }}"
         - name: mountCaCerts
           value: "{{ .Values.mountCaCerts }}"
         - name: pipelinesServiceAccountName

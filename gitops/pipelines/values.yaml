@@ -5,10 +5,10 @@
 
 gitSslVerify: true
 
-# dataScienceProjectDisplayName: yolo-uno-cards
-# dataScienceProjectNamespace: yolo-uno-cards
+dataScienceProjectDisplayName: yolo
+dataScienceProjectNamespace: yolo
 
-# instanceName: yolo-uno-cards
+instanceName: yolo
 
 createNamespace: true
 
