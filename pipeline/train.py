@@ -728,7 +728,8 @@ def train_model_optuna(
     print(f"Best model: {best_model_name}")
 
     # Load the best model
-    best_model = YOLO(f'{best_model_name}.pt')
+    best_model_name_path = os.path.join(models_folder, f"{best_model_name}.pt")
+    best_model = YOLO(f'{best_model_name_path}')
 
     # Convert the model to ONNX
     trained_model_onnx_path_tmp = best_model.export(format="onnx")
