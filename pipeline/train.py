@@ -1,6 +1,7 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
 import os
+from pyexpat import model
 import sys
 
 from typing import Dict
@@ -429,6 +430,323 @@ def train_model(
     if not training_mlrun:
         raise ValueError("MLflow run was not started")
 
+# This component trains a model using Optuna to optimize hyperparameters.
+# Arguments:
+# - model_name: The name of the model to train.
+# - n_trials: The number of trials to run.
+# - epochs: The number of epochs to train the model.
+# - experiment_name: The name of the MLflow experiment.
+# - run_name: The name of the MLflow run.
+# - tracking_uri: The URI of the MLflow tracking server.
+# - images_dataset_name: The name of the images dataset.
+# - images_datasets_root_folder: The root folder where the images datasets are stored.
+# - images_dataset_yaml: The YAML file containing the images dataset information.
+# - models_root_folder: The root folder where the models are stored.
+# - root_mount_path: The root mount path for the volumes.
+# - model_name_output: The output path for the trained model name.
+# - results_output_metrics: The output for the training results metrics.
+@dsl.component(
+    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
+    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
+    packages_to_install=["boto3==1.35.54", "botocore==1.35.54", "ultralytics==8.3.22", "load_dotenv==0.1.0", "numpy==1.26.4", "mlflow==2.17.1", "onnxruntime==1.19.2", "onnxslim==0.1.36", "optuna==4.1.0"]
+)
+def train_model_optuna(
+    model_name: str,                    # e.g: yolov8n
+    n_trials: int,                      # e.g: 5
+    epochs: int,                        # e.g: 2
+    experiment_name: str,               # e.g: yolo-uno-cards
+    run_name: str,                      # e.g: yolov-run-uno-cards
+    tracking_uri: str,                  # e.g: http://mlflow.kubeflow.svc.cluster.local:5000
+    images_dataset_name: str,           # e.g: uno-cards-v1.2
+    images_datasets_root_folder: str,   # e.g: /tmp/datasets
+    images_dataset_yaml: str,           # e.g: data.yaml
+    models_root_folder: str,            # e.g: models
+    experiments_root_folder: str,            # e.g: experiments
+    root_mount_path: str,               # e.g: /tmp/
+    model_name_output: OutputPath(str),
+    results_output_metrics: Output[Metrics]
+):
+    import os
+    import shutil
+    import time
+
+    import torch
+    from ultralytics import YOLO, settings
+    import mlflow
+
+    import numpy as np
+
+    import boto3
+    import botocore
+
+    import yaml
+
+    import optuna
+    
+    # Load search space from YAML
+    def load_search_space(file_path):
+        with open(file_path, "r") as f:
+            return yaml.safe_load(f)
+
+    # Map metric to model name
+    models = {}
+
+    # Define the objective function
+    def objective(model_name, dataset_path, trial, search_space):
+        # Dynamically define hyperparameter search space
+        params = {}
+        for param_name, param_config in search_space.items():
+            param_type = param_config["type"]
+            if param_type == "float":
+                params[param_name] = trial.suggest_float(
+                    param_name, param_config["low"], param_config["high"]
+                )
+            elif param_type == "uniform":
+                params[param_name] = trial.suggest_uniform(
+                    param_name, param_config["low"], param_config["high"]
+                )
+            elif param_type == "categorical":
+                params[param_name] = trial.suggest_categorical(
+                    param_name, param_config["choices"]
+                )
+            else:
+                raise ValueError(f"Unsupported parameter type: {param_type}")
+
+        # Define the YOLO model and dataset path
+        # Load the model
+        model = YOLO(f'{model_name}.pt')
+        
+        # Set the run name
+        train_run_name = f"{run_name}-{int(time.time())}"
+        print(f"Current run name: {train_run_name}")
+
+        # Start the MLflow run for training
+        with mlflow.start_run(run_name=train_run_name) as training_mlrun:
+            mlflow.log_param("dataset_file", f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}")
+            mlflow.log_param("dataset_name", images_dataset_name)
+            mlflow.log_param("datasets_root_folder", images_datasets_root_folder)
+            mlflow.log_param("dataset_yaml", images_dataset_yaml)
+            mlflow.log_param("device", device)
+            mlflow.log_param("batch_size", params["batch_size"])
+            mlflow.log_param("imgsz", params["input_size"])
+
+            print(f"Training model {model_name} with dataset {images_dataset_yaml_path}.")
+            # Train the model with sampled hyperparameters
+            results = model.train(
+                data=dataset_path,
+                epochs=epochs,
+                imgsz=params["input_size"],
+                batch=params["batch_size"],
+                optimizer=params["optimizer"],
+                lr0=params["learning_rate"],
+                momentum=params["momentum"],
+                weight_decay=params["weight_decay"],
+                conf=params["confidence_threshold"],
+                iou=params["iou_threshold"],
+                label_smoothing=params["label_smoothing"],
+                device=device
+            )
+
+            # If the results have the box attribute, log the metrics
+            if hasattr(results, 'box'):
+                results_output_metrics.log_metric("training/map", results.box.map)
+                results_output_metrics.log_metric("training/map50", results.box.map50)
+                results_output_metrics.log_metric("training/map75", results.box.map75)
+                results_output_metrics.log_metric("training/mp", results.box.mp)
+                results_output_metrics.log_metric("training/mr", results.box.mr)
+                results_output_metrics.log_metric("training/nc", results.box.nc)
+            else:
+                raise ValueError("No box attribute in the results!!!")
+            
+            # Use the evaluation metric as the objective
+            mAP = results.box.map
+
+            # Save the trained model
+            print(f"Saving model to {models_folder}")
+            trained_model_name = f"{model_name}-{train_run_name}"
+            print(f"Trained model name: {trained_model_name}")
+            trained_model_pt_path = os.path.join(models_folder, f"{trained_model_name}.pt")
+            print(f"Saving model to {trained_model_pt_path}")
+            model.save(trained_model_pt_path)
+
+            # Save model location by objective metric
+            models[trained_model_name] = mAP
+
+            # End the run
+            mlflow.end_run()
+
+            return mAP  # Higher mAP is better
+        
+        if not training_mlrun:
+            raise ValueError("MLflow run was not started")
+    
+    # Set the S3 bucket connection
+    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')
+    region_name = os.environ.get('AWS_DEFAULT_REGION')
+    bucket_name = os.environ.get('AWS_S3_BUCKET')
+    images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')
+
+    print(f"S3: endpoint_url {endpoint_url}")
+    print(f"S3: bucket_name {bucket_name}")
+    print(f"S3: images_dataset_s3_key {images_dataset_s3_key}")
+
+    print(f"tracking_uri {tracking_uri}")
+    print(f"experiment_name {experiment_name}")
+    print(f"images_dataset_name {images_dataset_name}")
+    print(f"images_datasets_root_folder {images_datasets_root_folder}")
+    print(f"images_dataset_yaml {images_dataset_yaml}")
+    print(f"models_root_folder {models_root_folder}")
+    print(f"root_mount_path {root_mount_path}")
+
+    session = boto3.session.Session(
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key
+    )
+
+    if not endpoint_url:
+        s3_resource = session.resource(
+            's3',
+            config=botocore.client.Config(signature_version='s3v4'),
+            region_name=region_name
+        )
+    else:
+        s3_resource = session.resource(
+            's3',
+            config=botocore.client.Config(signature_version='s3v4'),
+            endpoint_url=endpoint_url,
+            region_name=region_name
+        )
+
+    bucket = s3_resource.Bucket(bucket_name)
+
+    # Create a temporary directory to store the dataset
+    local_tmp_dir = '/tmp/optuna'
+    print(f">>> local_tmp_dir: {local_tmp_dir}")
+    
+    # Ensure local_tmp_dir exists
+    if not os.path.exists(local_tmp_dir):
+        os.makedirs(local_tmp_dir)
+
+    # Get the optuna study file name from the S3 key
+    study_name = f"{experiment_name}-optuna"
+    study_file_name = f"{study_name}.yaml"
+    study_file_key = f"{experiments_root_folder}/{study_file_name}"
+
+    print(f"study_file_name = {study_file_name}")
+
+    # Local study file path
+    study_local_file_path = f'{local_tmp_dir}/{study_file_name}'
+
+    # If optuna study file doesn't exist in the bucket raise a ValueError
+    objs = list(bucket.objects.filter(Prefix=study_file_key))
+    if not any(obj.key == study_file_key for obj in objs):
+        raise ValueError(f"File {study_file_key} does not exist in the bucket {bucket_name}")
+    
+    print(f"Downloading {study_file_key} to {study_local_file_path}")
+    bucket.download_file(study_file_key, study_local_file_path)
+    print(f"Downloaded {study_file_key}")
+
+    # If root_mount_path is not set or doesn't exist, raise a ValueError
+    if not root_mount_path or not os.path.exists(root_mount_path):
+        raise ValueError(f"Root mount path '{root_mount_path}' does not exist")
+
+    # Set the images dataset folder
+    images_dataset_folder = os.path.join(root_mount_path, images_datasets_root_folder, images_dataset_name)
+
+    # If the images dataset folder doesn't exist, raise a ValueError
+    if not os.path.exists(images_dataset_folder):
+        raise ValueError(f"Images dataset folder {images_dataset_folder} does not exist")
+
+    # Set the models folder
+    models_folder = os.path.join(root_mount_path, models_root_folder)
+
+    # Make sure the models folder exists
+    if not os.path.exists(models_folder):
+        os.makedirs(models_folder)
+
+    # Set the images dataset YAML path
+    images_dataset_yaml_path = os.path.join(images_dataset_folder, images_dataset_yaml)
+    print(f"Checking if {images_dataset_yaml_path} exists")
+    if not os.path.exists(images_dataset_yaml_path):
+        raise ValueError(f"Dataset YAML file {images_dataset_yaml} not found in {images_dataset_folder}")
+    print(f"Dataset YAML file found in {images_dataset_yaml_path}")
+
+    # Set the MLflow tracking URI and experiment
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
+    os.environ["MLFLOW_EXPERIMENT_NAME"] = experiment_name
+
+    # Update a setting
+    settings.update({"mlflow": True})
+
+    # Set device
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+        print(f"Using device: {torch.cuda.get_device_name(0)}")
+    elif torch.backends.mps.is_available():
+        device = "mps"
+        print("Using device: MPS")
+    print(f"Using device: {device}")
+
+    # Reset settings to default values
+    settings.reset()
+
+    # Load the search space
+    search_space = load_search_space(study_local_file_path)
+
+    # optuna storage
+    storage = f"sqlite:///{local_tmp_dir}/optuna.db"
+
+    # Create or load the study
+    study = optuna.create_study(
+        direction="maximize",
+        storage=storage,
+        study_name=study_name,
+        load_if_exists=True
+    )
+
+    # Run the optimization callback a func
+    study.optimize(lambda trial: objective(model_name, images_dataset_yaml_path, trial, search_space), 
+                   n_trials=n_trials)
+
+    # Print the best hyperparameters
+    print("\nBest Hyperparameters:")
+    print(study.best_params)
+
+    # Print study statistics
+    print("\nStudy best trial:")
+    print(study.best_trial)
+    print("\nStudy best value:")
+    print(study.best_value)
+    print("\nStudy trials:")
+    print(study.trials)
+
+    # Find the best model by metric (greater is better) in the models dictionary
+    best_model_name = max(models, key=models.get)
+    print(f"Best model: {best_model_name}")
+
+    # Load the best model
+    best_model = YOLO(f'{best_model_name}.pt')
+
+    # Convert the model to ONNX
+    trained_model_onnx_path_tmp = best_model.export(format="onnx")
+    if not trained_model_onnx_path_tmp:
+        print("Failed to export model to ONNX format")
+
+    # Save the onnx model
+    trained_model_onnx_path = os.path.join(models_folder, f"{best_model_name}.onnx")
+    print(f"Copying {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
+    shutil.copy(trained_model_onnx_path_tmp, trained_model_onnx_path)
+    print(f"Copied {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
+
+    # Set the output paths
+    with open(model_name_output, 'w') as f:
+        f.write(best_model_name)
+
+    
+    
 # Component to validate the metrics. It receives a list of tuples with the metric name and the threshold and the metrics as input.
 @dsl.component(
     # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
@@ -596,11 +914,12 @@ def pipeline(
     images_dataset_pvc_name: str = "images-datasets-pvc",
     images_dataset_pvc_size_in_gi: int = 5,
     models_root_folder: str = "models",
+    experiments_root_folder: str = "experiments", # Bucket folder <experiments_root_folder>/<experiment_name>-optuna.
     force_clean: bool = False,
     enable_caching: bool = False):
 
     # Define the root mount path
-    root_mount_path = '/opt/app-root/src'
+    root_mount_path = "/opt/app-root/src"
 
     # Define the datasets volume
     datasets_pvc_name = images_dataset_pvc_name
