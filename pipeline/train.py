@@ -723,6 +723,10 @@ def train_model_optuna(
     print("\nStudy trials:")
     print(study.trials)
 
+    # Print models
+    print("\nModels:")
+    print(models)
+
     # Find the best model by metric (greater is better) in the models dictionary
     best_model_name = max(models, key=models.get)
     print(f"Best model: {best_model_name}")
@@ -731,23 +735,16 @@ def train_model_optuna(
     best_model_name_path = os.path.join(models_folder, f"{best_model_name}.pt")
     best_model = YOLO(f'{best_model_name_path}')
 
-    # Convert the model to ONNX
+    # Export the model to ONNX
     trained_model_onnx_path_tmp = best_model.export(format="onnx")
+    print(f"Exported model to {trained_model_onnx_path_tmp}")
     if not trained_model_onnx_path_tmp:
         print("Failed to export model to ONNX format")
-
-    # Save the onnx model
-    trained_model_onnx_path = os.path.join(models_folder, f"{best_model_name}.onnx")
-    print(f"Copying {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
-    shutil.copy(trained_model_onnx_path_tmp, trained_model_onnx_path)
-    print(f"Copied {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
 
     # Set the output paths
     with open(model_name_output, 'w') as f:
         f.write(best_model_name)
 
-    
-    
 # Component to validate the metrics. It receives a list of tuples with the metric name and the threshold and the metrics as input.
 @dsl.component(
     # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
