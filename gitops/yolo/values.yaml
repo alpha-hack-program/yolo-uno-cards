@@ -46,7 +46,7 @@ datasets:
 
 models:
   connection:
-    name: datasets
+    name: models
     displayName: datasets
     type: s3
     scheme: http
