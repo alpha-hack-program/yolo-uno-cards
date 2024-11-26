@@ -7,3 +7,5 @@ datasets
 *.old
 .DS_Store
 temp.yaml
+experiments
+models

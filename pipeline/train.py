@@ -902,7 +902,8 @@ def pipeline(
     model_name: str = "yolov8n", 
     image_size: int = 640, 
     batch_size: int = 2, 
-    epochs: int = 1, 
+    epochs: int = 2,
+    n_trials: int = 1,
     experiment_name: str = "YOLOv8n",
     run_name: str = "uno-cards",
     tracking_uri: str = "http://mlflow-server:8080",
@@ -939,10 +940,9 @@ def pipeline(
     get_images_dataset_task.after(setup_storage_task)
 
     # Train the model
-    train_model_task = train_model(
+    train_model_task = train_model_optuna(
         model_name=model_name,
-        image_size=image_size,
-        batch_size=batch_size,
+        n_trials=n_trials,
         epochs=epochs,
         experiment_name=experiment_name,
         run_name=run_name,
@@ -951,6 +951,7 @@ def pipeline(
         images_datasets_root_folder=images_datasets_root_folder,
         images_dataset_yaml=images_dataset_yaml,
         models_root_folder=models_root_folder,
+        experiments_root_folder=experiments_root_folder,
         root_mount_path=root_mount_path
     ).set_caching_options(False)
     train_model_task.after(get_images_dataset_task)
