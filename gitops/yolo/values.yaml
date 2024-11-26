@@ -44,6 +44,18 @@ datasets:
     awsS3Bucket: datasets
     awsS3Endpoint: minio.ic-shared-minio.svc:9000
 
+models:
+  connection:
+    name: datasets
+    displayName: datasets
+    type: s3
+    scheme: http
+    awsAccessKeyId: minio
+    awsSecretAccessKey: minio123
+    awsDefaultRegion: none
+    awsS3Bucket: datasets
+    awsS3Endpoint: minio.ic-shared-minio.svc:9000
+
 pythonImage:
   version: "3.9"
   name: "python"
