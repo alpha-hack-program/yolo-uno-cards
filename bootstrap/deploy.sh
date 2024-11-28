@@ -57,7 +57,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ${DATA_SCIENCE_PROJECT_NAMESPACE}
-  namespace: openshift-gitops
+  namespace: ${ARGOCD_NAMESPACE}
 spec:
   project: default
   destination:
@@ -69,6 +69,8 @@ spec:
     targetRevision: ${TARGET_REVISION}
     helm:
       parameters:
+        - name: argocdNamespace
+          value: "${ARGOCD_NAMESPACE}"
         - name: vcs.url
           value: "${REPO_URL}"
         - name: vcs.ref
@@ -115,12 +117,12 @@ spec:
         - name: pipelines.connection.scheme
           value: "http"
         - name: datasets.connection.awsS3Endpoint
-          value: minio.ic-shared-minio.svc:9000"
+          value: "minio.ic-shared-minio.svc:9000"
 
         - name: models.connection.name
-          value: "datasets"
+          value: "models"
         - name: models.connection.displayName
-          value: "datasets"
+          value: "models"
         - name: models.connection.type
           value: "s3"
         - name: models.connection.awsAccessKeyId
@@ -130,11 +132,11 @@ spec:
         - name: models.connection.awsDefaultRegion
           value: "none"
         - name: models.connection.awsS3Bucket
-          value: "datasets"
+          value: "models"
         - name: pipelines.connection.scheme
           value: "http"
         - name: models.connection.awsS3Endpoint
-          value: minio.ic-shared-minio.svc:9000"
+          value: "minio.ic-shared-minio.svc:9000"
   syncPolicy:
     automated:
       selfHeal: true      

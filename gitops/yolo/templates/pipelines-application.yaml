@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.instanceName }}-pipelines
-  namespace: openshift-gitops
+  namespace: {{ .Values.argocdNamespace }}
 spec:
   project: default
   destination:
