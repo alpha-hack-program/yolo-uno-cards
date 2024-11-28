@@ -18,6 +18,8 @@ pipelinesWorkspaceDefaultSize: 2Gi
 
 pipelinesServiceAccountName: build-bot-sa
 
+eventListenerServiceAccountName: pipelines
+
 # pipelines:
 #   connection:
 #     name: pipelines
