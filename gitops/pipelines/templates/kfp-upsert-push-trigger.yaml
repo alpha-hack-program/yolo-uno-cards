@@ -4,7 +4,7 @@ metadata:
   name: "{{ .Values.kfpUpsertTektonPipelineName }}-github"
   namespace: {{ .Values.dataScienceProjectNamespace }}
 spec:
-  serviceAccountName: {{ .Values.pipelinesServiceAccountName }}
+  serviceAccountName: {{ .Values.eventListenerServiceAccountName }}
   triggers:
     - name: github-listener
       interceptors:
@@ -50,7 +50,7 @@ metadata:
   name: "{{ .Values.kfpUpsertTektonPipelineName }}-gitea"
   namespace: {{ .Values.dataScienceProjectNamespace }}
 spec:
-  serviceAccountName: {{ .Values.pipelinesServiceAccountName }}
+  serviceAccountName: {{ .Values.eventListenerServiceAccountName }}
   triggers:
     - name: github-listener
       interceptors:
@@ -96,7 +96,7 @@ metadata:
   name: "{{ .Values.kfpUpsertTektonPipelineName }}-gitlab"
   namespace: {{ .Values.dataScienceProjectNamespace }}
 spec:
-  serviceAccountName: {{ .Values.pipelinesServiceAccountName }}
+  serviceAccountName: {{ .Values.eventListenerServiceAccountName }}
   triggers:
     - name: gitlab-listener
       interceptors:
