@@ -17,6 +17,7 @@ if [ -z "$TOKEN" ]; then
   echo "Error: No token found. Please login to OpenShift using 'oc login' command."
   echo "Compile only mode."
 
+  python train_yolo_component.py
   python train.py
 
   exit 1
@@ -32,6 +33,7 @@ if [ -z "$DSPA_HOST" ]; then
   exit 1
 fi
 
+python train_yolo_component.py
 python train.py $TOKEN $DSPA_HOST
 
 

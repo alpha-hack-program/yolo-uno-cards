@@ -4,11 +4,11 @@
 #    batch_size: int [Default: 2.0]
 #    enable_caching: bool [Default: False]
 #    epochs: int [Default: 2.0]
-#    experiment_name: str [Default: 'YOLOv8n']
+#    experiment_name: str [Default: 'uno-cards-v1.2-1']
 #    experiments_root_folder: str [Default: 'experiments']
 #    force_clean: bool [Default: False]
 #    image_size: int [Default: 640.0]
-#    images_dataset_name: str [Default: 'uno-cards-v1.0']
+#    images_dataset_name: str [Default: 'uno-cards-v1.2']
 #    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
 #    images_dataset_pvc_size_in_gi: int [Default: 5.0]
 #    images_dataset_yaml: str [Default: 'data.yaml']
@@ -466,9 +466,9 @@ deploymentSpec:
         image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
         resources:
           cpuLimit: 6.0
-          cpuRequest: 4.0
-          memoryLimit: 8.589934592
-          memoryRequest: 6.442450944
+          cpuRequest: 6.0
+          memoryLimit: 12.884901888
+          memoryRequest: 12.884901888
     exec-upload-model:
       container:
         args:
@@ -699,7 +699,7 @@ root:
         isOptional: true
         parameterType: NUMBER_INTEGER
       experiment_name:
-        defaultValue: YOLOv8n
+        defaultValue: uno-cards-v1.2-1
         isOptional: true
         parameterType: STRING
       experiments_root_folder:
@@ -715,7 +715,7 @@ root:
         isOptional: true
         parameterType: NUMBER_INTEGER
       images_dataset_name:
-        defaultValue: uno-cards-v1.0
+        defaultValue: uno-cards-v1.2
         isOptional: true
         parameterType: STRING
       images_dataset_pvc_name:

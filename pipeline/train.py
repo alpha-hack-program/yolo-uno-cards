@@ -180,7 +180,8 @@ def get_images_dataset(
 
     bucket = s3_resource.Bucket(bucket_name)
 
-    # Create a temporary directory to store the dataset
+    # TODO don't download the file if it already exists in the volume mount path!!
+    # Create a temporary directory to store the dataset => TODO USE PVC INSTEAD!!!!! CLEAN LATER!!!
     local_tmp_dir = '/tmp/get_images_dataset'
     print(f">>> local_tmp_dir: {local_tmp_dir}")
     
@@ -904,10 +905,10 @@ def pipeline(
     batch_size: int = 2, 
     epochs: int = 2,
     n_trials: int = 1,
-    experiment_name: str = "YOLOv8n",
+    experiment_name: str = "uno-cards-v1.2-1",
     run_name: str = "uno-cards",
     tracking_uri: str = "http://mlflow-server:8080",
-    images_dataset_name: str = "uno-cards-v1.0",
+    images_dataset_name: str = "uno-cards-v1.2",
     images_datasets_root_folder: str = "datasets",
     images_dataset_yaml: str = "data.yaml",
     images_dataset_pvc_name: str = "images-datasets-pvc",
@@ -943,7 +944,7 @@ def pipeline(
     train_model_task = train_model_optuna(
         model_name=model_name,
         n_trials=n_trials,
-        epochs=epochs,
+        epochs=epochs, # TODO this should come from the optuna study
         experiment_name=experiment_name,
         run_name=run_name,
         tracking_uri=tracking_uri,
@@ -955,9 +956,10 @@ def pipeline(
         root_mount_path=root_mount_path
     ).set_caching_options(False)
     train_model_task.after(get_images_dataset_task)
-    train_model_task.set_memory_request("6Gi")
-    train_model_task.set_cpu_request("4")
-    train_model_task.set_memory_limit("8Gi")
+    # TODO externalize these values
+    train_model_task.set_memory_request("12Gi")
+    train_model_task.set_cpu_request("6")
+    train_model_task.set_memory_limit("12Gi")
     train_model_task.set_cpu_limit("6")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
