@@ -27,6 +27,7 @@ def train_yolo(
     images_datasets_root_folder: str,
     images_dataset_yaml: str,
     models_root_folder: str,
+    metric_value_output: OutputPath(float),
     model_name_output: OutputPath(str),
     results_output_metrics: Output[Metrics]
 ):
@@ -154,6 +155,7 @@ def train_yolo(
                 device=device
             )
         
+        metric_value = 0.0
         if hasattr(results, 'box'):
             results_output_metrics.log_metric("training/map", results.box.map if results.box.map is not None else 0.0)
             results_output_metrics.log_metric("training/map50", results.box.map50 if results.box.map50 is not None else 0.0)
@@ -161,6 +163,8 @@ def train_yolo(
             results_output_metrics.log_metric("training/mp", results.box.mp if results.box.mp is not None else 0.0)
             results_output_metrics.log_metric("training/mr", results.box.mr if results.box.mr is not None else 0.0)
             results_output_metrics.log_metric("training/nc", results.box.nc if results.box.nc is not None else 0.0)
+
+            metric_value = results.box.map
         else:
             print("No box attribute in the results!!!")
 
@@ -215,9 +219,13 @@ def train_yolo(
         shutil.copy(trained_model_onnx_path_tmp, trained_model_onnx_path)
         print(f"Copied {trained_model_onnx_path_tmp} to {trained_model_onnx_path}")
 
-        # Set the output paths
+        # Output the model_name
         with open(model_name_output, 'w') as f:
             f.write(trained_model_name)
+        
+        # Output the metric_value
+        with open(metric_value_output, 'w') as f:
+            f.write(str(metric_value))
 
     if not training_mlrun:
         raise ValueError("MLflow run was not started")

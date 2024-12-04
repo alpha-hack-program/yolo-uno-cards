@@ -25,6 +25,14 @@ from kfp import local
 
 local.init(runner=local.SubprocessRunner())
 
+os.environ['AWS_ACCESS_KEY_ID'] = 'minio'
+os.environ['AWS_SECRET_ACCESS_KEY'] = 'minio123'
+os.environ['AWS_DEFAULT_REGION'] = 'none'
+os.environ['AWS_S3_BUCKET'] = 'models'
+os.environ['AWS_S3_ENDPOINT'] = f'https://minio-api-ic-shared-minio.apps.ocp.sandbox2563.opentlc.com'
+os.environ['EXPERIMENT_REPORTS_FOLDER_S3_KEY'] = 'experiment-reports'
+
+
 def generate_search_space(
     epochs_type: str,
     epochs_bounds: str,
@@ -100,25 +108,25 @@ def generate_search_space(
 # run pipeline
 generate_search_space_task = generate_search_space(
     epochs_type="categorical",
-    epochs_bounds="1",
+    epochs_bounds="2",
     lr_type="float",                           # float, categorical uniform
     lr_bounds="0.001, 0.01",
     momentum_type="uniform",                   # float, categorical uniform
     momentum_bounds="0.9, 0.99",
     weight_decay_type="float",                 # float, categorical uniform
-    weight_decay_bounds="0.0005, 0.01",
+    weight_decay_bounds="0.0005, 0.001",
     image_size_type="categorical",             # float, categorical uniform
     image_size_bounds="640",
     confidence_threshold_type="uniform",       # float, categorical uniform
-    confidence_threshold_bounds="0.1, 0.9",
+    confidence_threshold_bounds="0.001, 0.005",
     iou_threshold_type="uniform",              # float, categorical uniform
-    iou_threshold_bounds="0.4, 0.9",
+    iou_threshold_bounds="0.4, 0.6",
     optimizer_type="categorical",              # float, categorical uniform
     optimizer_bounds="Adam",
     label_smoothing_type="uniform",            # float, categorical uniform
-    label_smoothing_bounds="0.01, 0.5",
+    label_smoothing_bounds="0.07, 0.2",
     batch_size_type="categorical",             # float, categorical uniform
-    batch_size_bounds="32",
+    batch_size_bounds="2, 16, 32",
 )
 # print(generate_search_space_task.outputs["Output"])
 print(generate_search_space_task)
@@ -136,8 +144,14 @@ def train_model_optuna(
     model_name: str,                    # e.g: yolov8n
     n_trials: int,                      # e.g: 5
     search_space: str,
-    experiment_name_prefix: str,
+    experiment_name: str,
     pipeline_name: str,
+    images_dataset_name: str = "uno-cards-v1.2",
+    images_datasets_root_folder: str = "datasets",
+    images_dataset_yaml: str = "data.yaml",
+    models_root_folder: str = "models",
+    images_dataset_pvc_name: str = "images-datasets-pvc",
+    images_dataset_pvc_size_in_gi: int = 5,
 ):
     import os
     import time
@@ -145,6 +159,17 @@ def train_model_optuna(
     import re
 
     import optuna
+
+    import boto3
+    import botocore
+    import os
+
+    aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+    aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')
+    region_name = os.environ.get('AWS_DEFAULT_REGION')
+    bucket_name = os.environ.get('AWS_S3_BUCKET')
+    experiment_reports_folder = os.environ.get('EXPERIMENT_REPORTS_FOLDER_S3_KEY')
 
     # Get token path from environment or default to kubernetes token location
     TOKEN_PATH = os.environ.get("TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token")
@@ -198,29 +223,6 @@ def train_model_optuna(
 
     def get_pipeline_id_by_name(client: kfp.Client, pipeline_name: str):
         return client.get_pipeline_id(pipeline_name)
-
-    def get_pipeline_by_name(client: kfp.Client, pipeline_name: str):
-        import json
-
-        # Define filter predicates
-        filter_spec = json.dumps({
-            "predicates": [{
-                "key": "display_name",
-                "operation": "EQUALS",
-                "stringValue": pipeline_name,
-            }]
-        })
-
-        # List pipelines with the specified filter
-        pipelines = client.list_pipelines(filter=filter_spec)
-
-        if not pipelines.pipelines:
-            return None
-        for pipeline in pipelines.pipelines:
-            if pipeline.display_name == pipeline_name:
-                return pipeline
-
-        return None
     
     def get_pipeline(client: kfp.Client, pipeline_id: str):
         return client.get_pipeline(pipeline_id)
@@ -260,28 +262,52 @@ def train_model_optuna(
         print(f"run: {run}")
         return run.run_id
 
-    # Function that waits for a run to complete
-    # RUNTIME_STATE_UNSPECIFIED: Default value. This value is not used.
-    # PENDING: Service is preparing to execute an entity.
-    # RUNNING: Entity execution is in progress.
-    # SUCCEEDED: Entity completed successfully.
-    # SKIPPED: Entity has been skipped. For example, due to caching.
-    # FAILED: Entity execution has failed.
-    # CANCELING: Entity is being canceled. From this state, an entity may only
-    # change its state to SUCCEEDED, FAILED or CANCELED.
-    # CANCELED: Entity has been canceled.
-    # PAUSED: Entity has been paused. It can be resumed.
-    def wait_for_run_completion(client: kfp.Client, run_id: str):
-        while True:
-            run = client.get_run(run_id=run_id)
-            print(f"run_id: {run.run_id} state: {run.state}")
-            if run.state in ["SUCCEEDED", "FAILED", "SKIPPED"]:
-                break
-            time.sleep(10)
+    # Download experiment report from S3 bucket and folder
+    def download_experiment_report(experiment_name: str) -> dict:
+        # Experiment report s3 key to store the report
+        experiment_report_file_name = f"{experiment_name}.yaml"
+        experiment_report_s3_key = f"{experiment_reports_folder}/{experiment_report_file_name}"
+        print(f"experiment_report_s3_key = {experiment_report_s3_key}")
+         # Create a session using the provided credentials and region
+        session = boto3.session.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
 
+        # Create an S3 resource object using the session and region
+        s3_resource = session.resource(
+            's3',
+            config=botocore.client.Config(signature_version='s3v4'),
+            endpoint_url=endpoint_url,
+            region_name=region_name
+        )
+
+        # Get the bucket
+        bucket = s3_resource.Bucket(bucket_name)
+
+        # Create a temporary directory to store the report
+        local_tmp_dir = '/tmp/experiment_report'
+        print(f">>> local_tmp_dir: {local_tmp_dir}")
+        
+        # Ensure local_tmp_dir exists
+        if not os.path.exists(local_tmp_dir):
+            os.makedirs(local_tmp_dir)
+
+        # Local file to store the report
+        experiment_report_file_path = f'{local_tmp_dir}/{experiment_report_file_name}'
+
+        print(f"Downloading {experiment_report_s3_key} to {experiment_report_file_path}")
+        bucket.download_file(experiment_report_s3_key, experiment_report_file_path)
+        print(f"Downloaded {experiment_report_s3_key}")
+
+        # Read the content of the file and retun it
+        experiment_report = None
+        with open(experiment_report_file_path, 'r') as file:
+            experiment_report = file.read()
+        return load_yaml(experiment_report)
 
     # Return a dict from a yaml string
-    def load_search_space(search_space: str) -> dict:
+    def load_yaml(search_space: str) -> dict:
         return yaml.safe_load(search_space)
 
     # Define the objective function
@@ -318,6 +344,21 @@ def train_model_optuna(
             else:
                 raise ValueError(f"Unsupported parameter type: {param_type}")
 
+        # run_name compose of the experiment name and the optuna 'trial' number
+        run_name = f"{experiment_name}-trial-{trial.number}"
+        print(f"Run name: {run_name}")
+        
+        # Add experiment_name, here is the experiment name is the run_name 
+        params["experiment_name"] = run_name
+
+        # Add parmaters to set the dataset to use, etc.
+        params["images_dataset_name"] = images_dataset_name
+        params["images_datasets_root_folder"] = images_datasets_root_folder
+        params["images_dataset_yaml"] = images_dataset_yaml
+        params["models_root_folder"] = models_root_folder
+        params["images_dataset_pvc_name"] = images_dataset_pvc_name
+        params["images_dataset_pvc_size_in_gi"] = images_dataset_pvc_size_in_gi
+
         print(f"params: {params}")
 
         # Use the evaluation metric as the objective
@@ -340,26 +381,20 @@ def train_model_optuna(
                 print(f"pipeline: {pipeline}")
 
                 # Create a run
-                run_name = f"{experiment_name}-trial-{trial.number}"
-                print(f"Run name: {run_name}")
                 run_id = create_run(client, pipeline_id, experiment_id, run_name, params)
 
                 # Wait for the run to complete
                 # wait_for_run_completion(client, run_id)
                 run_details = client.wait_for_run_completion(run_id=run_id, timeout=3600, sleep_duration=10)
-
-                # Get the run
-                # run_details = client.get_run(run_id=run_id)
                 print(f"run_details {run_details}")
 
-                # Get metrics from the run and find metric_name
-                task_details = run_details.run_details.task_details
-                print(f"task_details {task_details}")
+                # Get metrics from run_details is not working...
 
-                # .get('pipeline_runtime', {}).get('execution_metrics', [])
-                # for metric in metrics:
-                #     print(f"Metric Name: {metric['name']}, Value: {metric['value']}")
-
+                # Load the experiment report from S3 we use the run_name as the experiment name
+                experiment_report = download_experiment_report(run_name)
+                # Access the values
+                metric_value = experiment_report['report']['metric_value']
+                print(f"metric_value: {metric_value}")
             else:
                 print(f"Pipeline {pipeline_name} does not exist.") 
                 raise ValueError(f"Pipeline {pipeline_name} does not exist.")
@@ -377,7 +412,6 @@ def train_model_optuna(
     print(f"KFP endpoint: {kfp_endpoint}")
 
     # Generate the experiment name from the prefix and timestamp
-    experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
     print(f"Experiment name: {experiment_name}")
 
     # Get the optuna study file name from the S3 key
@@ -401,7 +435,7 @@ def train_model_optuna(
     )
 
     # Load search space from str
-    search_space = load_search_space(search_space)
+    search_space = load_yaml(search_space)
 
     # Run the optimization callback a func
     study.optimize(lambda trial: objective(trial, search_space, experiment_name, token, kfp_endpoint), n_trials=n_trials)
@@ -418,11 +452,15 @@ def train_model_optuna(
     print("\nStudy trials:")
     print(study.trials)
 
+import time
+
+experiment_name_prefix="exp-002"
+experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
 train_model_task = train_model_optuna(
         model_name="model_name",
-        n_trials=1,
+        n_trials=2,
         search_space=generate_search_space_task,
-        experiment_name_prefix="exp-002",
+        experiment_name=experiment_name,
         pipeline_name="train_yolo"
     )
 

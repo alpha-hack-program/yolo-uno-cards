@@ -21,6 +21,7 @@ setup_storage_component = load_component_from_file('setup_storage_component.yaml
 get_images_dataset_component = load_component_from_file('get_images_dataset_component.yaml')
 train_yolo_component = load_component_from_file('train_yolo_component.yaml')
 upload_model_component = load_component_from_file('upload_model_component.yaml')
+upload_experiment_report_component = load_component_from_file('upload_experiment_report_component.yaml')
 
 DATASETS_CONNECTION_SECRET = "aws-connection-datasets"
 MODELS_CONNECTION_SECRET = "aws-connection-models"
@@ -139,15 +140,21 @@ def pipeline(
     #     effect='NoSchedule'
     # )
 
-    # Extract model name
+    # Extract model name and metric value
     model_name = train_model_task.outputs["model_name_output"]
-
+    metric_value = train_model_task.outputs["metric_value_output"]
 
     # Upload the model
     upload_model_task = upload_model_component(
         root_mount_path=root_mount_path,
         models_root_folder=models_root_folder,
         model_name=model_name
+    ).after(train_model_task).set_caching_options(False)
+
+    # Upload the experiment report
+    upload_experiment_report_component_task = upload_experiment_report_component(
+        experiment_name=experiment_name,
+        metric_value=metric_value
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 
@@ -161,6 +168,20 @@ def pipeline(
     upload_model_task.set_env_variable(name="MODELS_S3_KEY", value="models/yolo")
     kubernetes.use_secret_as_env(
         task=upload_model_task,
+        secret_name=MODELS_CONNECTION_SECRET,
+        secret_key_to_env={
+            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
+            'AWS_DEFAULT_REGION': 'AWS_DEFAULT_REGION',
+            'AWS_S3_BUCKET': 'AWS_S3_BUCKET',
+            'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
+        }
+    )
+
+    # Setting environment variables for upload_experiment_report_component_task
+    upload_experiment_report_component_task.set_env_variable(name="EXPERIMENT_REPORTS_FOLDER_S3_KEY", value="experiment-reports")
+    kubernetes.use_secret_as_env(
+        task=upload_experiment_report_component_task,
         secret_name=MODELS_CONNECTION_SECRET,
         secret_key_to_env={
             'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',

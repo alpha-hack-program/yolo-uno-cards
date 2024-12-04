@@ -40,7 +40,7 @@ MODELS_CONNECTION_SECRET = "aws-connection-models"
 #   high: 0.1
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
-    packages_to_install=["boto3==1.35.54", "botocore==1.35.54", "ultralytics==8.3.22", "load_dotenv==0.1.0", "numpy==1.26.4", "mlflow==2.17.1", "onnxruntime==1.19.2", "onnxslim==0.1.36", "optuna==4.1.0"]
+    packages_to_install=["load_dotenv==0.1.0"]
 )
 def generate_search_space(
     epochs_type: str,
@@ -132,7 +132,7 @@ def generate_search_space(
 @dsl.component(
     # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
     base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
-    packages_to_install=["boto3==1.35.54", "botocore==1.35.54", "ultralytics==8.3.22", "load_dotenv==0.1.0", "numpy==1.26.4", "mlflow==2.17.1", "onnxruntime==1.19.2", "onnxslim==0.1.36", "optuna==4.1.0"]
+    packages_to_install=["load_dotenv==0.1.0", "optuna==4.1.0", "kfp[kubernetes]==2.8.0", "kubernetes==23.6.0"]
 )
 def train_model_optuna(
     model_name: str,                    # e.g: yolov8n
@@ -143,15 +143,18 @@ def train_model_optuna(
 ):
     import os
     import time
-
     import yaml
+    import re
 
     import optuna
+
+    # Get token path from environment or default to kubernetes token location
+    TOKEN_PATH = os.environ.get("TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token")
 
     # Get the service account token or return None
     def get_token():
         try:
-            with open("/var/run/secrets/kubernetes.io/serviceaccount/token", "r") as f:
+            with open(TOKEN_PATH, "r") as f:
                 return f.read().strip()
         except Exception as e:
             print(f"Error: {e}")
@@ -165,9 +168,14 @@ def train_model_optuna(
         except config.config_exception.ConfigException:
             config.load_kube_config()
 
+        # Get token path from environment or default to kubernetes token location
+        NAMESPACE_PATH = os.environ.get("NAMESPACE_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+
         # Get the current namespace
-        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+        with open(NAMESPACE_PATH, "r") as f:
             namespace = f.read().strip()
+
+        print(f"namespace: {namespace}")
 
         # Create Kubernetes API client
         api_instance = client.CustomObjectsApi()
@@ -189,7 +197,10 @@ def train_model_optuna(
         except Exception as e:
             print(f"Error: {e}")
             return None
-        
+
+    def get_pipeline_id_by_name(client: kfp.Client, pipeline_name: str):
+        return client.get_pipeline_id(pipeline_name)
+
     def get_pipeline_by_name(client: kfp.Client, pipeline_name: str):
         import json
 
@@ -213,40 +224,43 @@ def train_model_optuna(
 
         return None
     
+    def get_pipeline(client: kfp.Client, pipeline_id: str):
+        return client.get_pipeline(pipeline_id)
+
+    def get_latest_pipeline_version_id(client: kfp.Client, pipeline_id: str) -> Optional[str]:
+        pipeline_versions = client.list_pipeline_versions(
+            pipeline_id=pipeline_id,
+            sort_by="created_at desc",
+            page_size=10
+        )
+        if pipeline_versions and len(pipeline_versions.pipeline_versions) >= 1:
+            # Order pipeline_versions by created_at in descending order and return the first one
+            pipeline_versions.pipeline_versions.sort(key=lambda x: x.created_at, reverse=True)
+            return pipeline_versions.pipeline_versions[0].pipeline_version_id
+        else:
+            return None
+
     # Function that create a kpf experiment and returns the id
     def create_experiment(client: kfp.Client, experiment_name: str) -> str:
         experimment = client.create_experiment(name=experiment_name)
-        return experimment.id
+        print(f">>>experimment: {experimment}")
+        return experimment.experiment_id
 
-    # Function that creates a run of a pipeline id in a given experiment id
+    # Function that creates a run of a pipeline id in a given experiment id with the latest version of the pipeline
     def create_run(client: kfp.Client, pipeline_id: str, experiment_id: str, run_name: str, params: dict) -> str:
+        pipeline_version_id = get_latest_pipeline_version_id(client, pipeline_id)
+        print(f">>>pipeline_version_id: {pipeline_version_id}")
+        if pipeline_version_id is None:
+            raise ValueError(f"No pipeline versions found for pipeline_id: {pipeline_id}")
         run = client.run_pipeline(
             experiment_id=experiment_id,
             job_name=run_name,
             pipeline_id=pipeline_id,
+            version_id=pipeline_version_id,
             params=params
         )
-        return run.id
-
-    # Function that waits for a run to complete
-    # RUNTIME_STATE_UNSPECIFIED: Default value. This value is not used.
-    # PENDING: Service is preparing to execute an entity.
-    # RUNNING: Entity execution is in progress.
-    # SUCCEEDED: Entity completed successfully.
-    # SKIPPED: Entity has been skipped. For example, due to caching.
-    # FAILED: Entity execution has failed.
-    # CANCELING: Entity is being canceled. From this state, an entity may only
-    # change its state to SUCCEEDED, FAILED or CANCELED.
-    # CANCELED: Entity has been canceled.
-    # PAUSED: Entity has been paused. It can be resumed.
-    def wait_for_run_completion(client: kfp.Client, run_id: str):
-        while True:
-            run = client.get_run(run_id=run_id)
-            if run.state in ["SUCCEEDED", "FAILED", "SKIPPED"]:
-                break
-            time.sleep(10)
-
-    # Function that gets the metrics of a run
+        print(f"run: {run}")
+        return run.run_id
 
 
     # Return a dict from a yaml string
@@ -254,51 +268,80 @@ def train_model_optuna(
         return yaml.safe_load(search_space)
 
     # Define the objective function
-    def objective(trial: optuna.Trial, search_space: dict, experiment_name: str):
+    def objective(trial: optuna.Trial, search_space: dict, experiment_name: str, token: str, kfp_endpoint: str):
         # Dynamically define hyperparameter search space
         params = {}
         for param_name, param_config in search_space.items():
             param_type = param_config["type"]
             if param_type == "float":
+                low = float(param_config["low"])
+                high = float(param_config["high"])
                 params[param_name] = trial.suggest_float(
-                    param_name, param_config["low"], param_config["high"]
+                    param_name, low, high
                 )
             elif param_type == "uniform":
+                low = float(param_config["low"])
+                high = float(param_config["high"])
                 params[param_name] = trial.suggest_uniform(
-                    param_name, param_config["low"], param_config["high"]
+                    param_name, low, high
                 )
             elif param_type == "categorical":
+                # Check if choices match a number pattern
+                choices = []
+                for choice in param_config["choices"]:
+                    # check if matches number pattern
+                    if re.match(r'^-?\d+(?:\.\d+)?$', choice):
+                        # Convert to float or int
+                        choices.append(float(choice) if '.' in choice else int(choice))
+                    else:
+                        choices.append(choice)
                 params[param_name] = trial.suggest_categorical(
-                    param_name, param_config["choices"]
+                    param_name, choices
                 )
             else:
                 raise ValueError(f"Unsupported parameter type: {param_type}")
 
+        print(f"params: {params}")
+
+        # Use the evaluation metric as the objective
+        metric_name = "training/map"
+        metric_value = 0.0
         try:
+            client = kfp.Client(host=kfp_endpoint, existing_token=token)
+
             # Get the pipeline by name
-            print(f"Pipeline name: {pipeline_name}")
-            existing_pipeline = get_pipeline_by_name(client, pipeline_name)
-            if existing_pipeline:
-                print(f"Pipeline ID {existing_pipeline.pipeline_id}")
+            print(f">>> Pipeline name: {pipeline_name}")
+            pipeline_id = get_pipeline_id_by_name(client, pipeline_name)
+            if pipeline_id:
+                print(f"Pipeline ID {pipeline_id}")
                 
                 # Create a experiment
                 experiment_id = create_experiment(client, experiment_name)
 
+                # Get pipeline
+                pipeline = get_pipeline(client, pipeline_id)
+                print(f"pipeline: {pipeline}")
+
                 # Create a run
                 run_name = f"{experiment_name}-trial-{trial.number}"
                 print(f"Run name: {run_name}")
-                run_id = create_run(client, existing_pipeline.pipeline_id, experiment_id, run_name, params)
+                run_id = create_run(client, pipeline_id, experiment_id, run_name, params)
 
                 # Wait for the run to complete
-                wait_for_run_completion(client, run_id)
+                # wait_for_run_completion(client, run_id)
+                run_details = client.wait_for_run_completion(run_id=run_id, timeout=3600, sleep_duration=10)
 
                 # Get the run
-                run_details = client.get_run(run_id=run_id)
+                # run_details = client.get_run(run_id=run_id)
+                print(f"run_details {run_details}")
 
-                # Get metrics from the run
-                metrics = run_details.get('pipeline_runtime', {}).get('execution_metrics', [])
-                for metric in metrics:
-                    print(f"Metric Name: {metric['name']}, Value: {metric['value']}")
+                # Get metrics from the run and find metric_name
+                task_details = run_details.run_details.task_details
+                print(f"task_details {task_details}")
+
+                # .get('pipeline_runtime', {}).get('execution_metrics', [])
+                # for metric in metrics:
+                #     print(f"Metric Name: {metric['name']}, Value: {metric['value']}")
 
             else:
                 print(f"Pipeline {pipeline_name} does not exist.") 
@@ -306,25 +349,15 @@ def train_model_optuna(
         except Exception as e:
             print(f"Error: {e}")
             raise ValueError(f"Error: {e}")
-
         
-                
-        
-        # Use the evaluation metric as the objective
-        mAP = 0.0
-
-        return mAP  # Higher mAP is better
+        return metric_value
     
-    if not token:
-        print("Token endpoint not provided finding it automatically.")
-        token = get_token()
-
-    if not kfp_endpoint:
-        print("KFP endpoint not provided finding it automatically.")
-        kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
-
     
-
+    # Get token and kfp endpoint
+    token = get_token()
+    print(f"Token: {token}")
+    kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
+    print(f"KFP endpoint: {kfp_endpoint}")
 
     # Generate the experiment name from the prefix and timestamp
     experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
@@ -354,7 +387,7 @@ def train_model_optuna(
     search_space = load_search_space(search_space)
 
     # Run the optimization callback a func
-    study.optimize(lambda trial: objective(trial, search_space), n_trials=n_trials)
+    study.optimize(lambda trial: objective(trial, search_space, experiment_name, token, kfp_endpoint), n_trials=n_trials)
 
     # Print the best hyperparameters
     print("\nBest Hyperparameters:")
@@ -382,27 +415,27 @@ def yield_not_deployed_error():
 def pipeline(
     experiment_name_prefix: str = "yolo-uno-cards-",
     model_name: str = "yolov8n", 
-    n_trials: int = 5,
+    n_trials: int = 3,
     epochs_type: str = "categorical",
     epochs_bounds: str = "2",
     lr_type: str = "float",                           # float, categorical uniform
-    lr_bounds: str = "0.00001, 0.01",
+    lr_bounds: str = "0.001, 0.01",
     momentum_type: str = "uniform",                   # float, categorical uniform
-    momentum_bounds: str = "0.8, 0.95",
+    momentum_bounds: str = "0.9, 0.99",
     weight_decay_type: str = "float",                 # float, categorical uniform
-    weight_decay_bounds: str = "0.85, 0.95",
+    weight_decay_bounds: str = "0.0005, 0.001",
     image_size_type: str = "categorical",             # float, categorical uniform
-    image_size_bounds: str = "320, 416, 608",
+    image_size_bounds: str = "640",
     confidence_threshold_type: str = "uniform",       # float, categorical uniform
-    confidence_threshold_bounds: str = "0.1, 0.5",
+    confidence_threshold_bounds: str = "0.001, 0.005",
     iou_threshold_type: str = "uniform",              # float, categorical uniform
     iou_threshold_bounds: str = "0.4, 0.6",
     optimizer_type: str = "categorical",              # float, categorical uniform
-    optimizer_bounds: str = "SGD, Adam, AdamW",
+    optimizer_bounds: str = "Adam",                   # Adam, SGD, AdamW
     label_smoothing_type: str = "uniform",            # float, categorical uniform
-    label_smoothing_bounds: str = "0.0, 0.1",
+    label_smoothing_bounds: str = "0.07, 0.2",
     batch_size_type: str = "categorical",             # float, categorical uniform
-    batch_size_bounds: str = "8, 16, 32, 64",
+    batch_size_bounds: str = "8, 16, 32",
     pipeline_name: str = 'train_yolo'):
 
     
