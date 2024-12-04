@@ -155,12 +155,12 @@ def train_yolo(
             )
         
         if hasattr(results, 'box'):
-            results_output_metrics.log_metric("training/map", results.box.map)
-            results_output_metrics.log_metric("training/map50", results.box.map50)
-            results_output_metrics.log_metric("training/map75", results.box.map75)
-            results_output_metrics.log_metric("training/mp", results.box.mp)
-            results_output_metrics.log_metric("training/mr", results.box.mr)
-            results_output_metrics.log_metric("training/nc", results.box.nc)
+            results_output_metrics.log_metric("training/map", results.box.map if results.box.map is not None else 0.0)
+            results_output_metrics.log_metric("training/map50", results.box.map50 if results.box.map50 is not None else 0.0)
+            results_output_metrics.log_metric("training/map75", results.box.map75 if results.box.map75 is not None else 0.0)
+            results_output_metrics.log_metric("training/mp", results.box.mp if results.box.mp is not None else 0.0)
+            results_output_metrics.log_metric("training/mr", results.box.mr if results.box.mr is not None else 0.0)
+            results_output_metrics.log_metric("training/nc", results.box.nc if results.box.nc is not None else 0.0)
         else:
             print("No box attribute in the results!!!")
 
