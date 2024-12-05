@@ -3,6 +3,9 @@
 # Load environment variables
 . .env
 
+# If Crunchy PostgreSQL Operator is not installed, install it
+if [ -z "$(oc get subscription crunchy-postgres-operator -n openshift-operators)" ]; then
+echo "Crunchy PostgreSQL Operator not installed"
 # Install the Crunchy PostgreSQL Operator in manual mode
 echo "Installing the Crunchy PostgreSQL Operator in manual mode"
 cat <<EOF | oc create -f -
@@ -19,7 +22,6 @@ spec:
   sourceNamespace: openshift-marketplace
   startingCSV: ${CRUNCHY_POSTGRES_CSV}
 EOF
-
 # Wait for the install plan to be created
 echo "Waiting for the install plan to be created"
 while [ -z "$(oc get installplans -n openshift-operators | grep ${CRUNCHY_POSTGRES_CSV})" ]; do
@@ -50,6 +52,9 @@ for installplan in $installplans; do
   echo "Deleting $installplan"
   oc delete installplan/$installplan -n openshift-operators
 done
+else
+  echo "Crunchy PostgreSQL Operator already installed"
+fi
 
 # Create an ArgoCD application to deploy the helm chart at this repository and path ./gitops/doc-bot
 cat <<EOF | oc apply -f -
@@ -57,7 +62,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ${DATA_SCIENCE_PROJECT_NAMESPACE}
-  namespace: openshift-gitops
+  namespace: ${ARGOCD_NAMESPACE}
 spec:
   project: default
   destination:
@@ -69,6 +74,8 @@ spec:
     targetRevision: ${TARGET_REVISION}
     helm:
       parameters:
+        - name: argocdNamespace
+          value: "${ARGOCD_NAMESPACE}"
         - name: vcs.url
           value: "${REPO_URL}"
         - name: vcs.ref
@@ -93,8 +100,11 @@ spec:
           value: "none"
         - name: pipelines.connection.awsS3Bucket
           value: "pipelines"
+        - name: pipelines.connection.scheme
+          value: "http"
         - name: pipelines.connection.awsS3Endpoint
-          value: "http://minio.ic-shared-minio.svc:9000"
+          value: "${MINIO_ENDPOINT}"
+
         - name: datasets.connection.name
           value: "datasets"
         - name: datasets.connection.displayName
@@ -109,8 +119,29 @@ spec:
           value: "none"
         - name: datasets.connection.awsS3Bucket
           value: "datasets"
+        - name: pipelines.connection.scheme
+          value: "http"
         - name: datasets.connection.awsS3Endpoint
-          value: "http://minio.ic-shared-minio.svc:9000"
+          value: "${MINIO_ENDPOINT}"
+
+        - name: models.connection.name
+          value: "models"
+        - name: models.connection.displayName
+          value: "models"
+        - name: models.connection.type
+          value: "s3"
+        - name: models.connection.awsAccessKeyId
+          value: "${MINIO_ACCESS_KEY}"
+        - name: models.connection.awsSecretAccessKey
+          value: "${MINIO_SECRET_KEY}"
+        - name: models.connection.awsDefaultRegion
+          value: "none"
+        - name: models.connection.awsS3Bucket
+          value: "models"
+        - name: pipelines.connection.scheme
+          value: "http"
+        - name: models.connection.awsS3Endpoint
+          value: "${MINIO_ENDPOINT}"
   syncPolicy:
     automated:
       selfHeal: true      
@@ -127,9 +158,9 @@ done
 # Deploy the MLflow server
 helm repo add strangiato https://strangiato.github.io/helm-charts/
 helm upgrade -n ${DATA_SCIENCE_PROJECT_NAMESPACE} -i mlflow-server \
-  --set objectStorage.objectBucketClaim.enable=false \
+  --set objectStorage.objectBucketClaim.enabled=false \
   --set objectStorage.mlflowBucketName=mlflow \
-  --set objectStorage.s3EndpointUrl=http://minio.ic-shared-minio.svc:9000 \
+  --set objectStorage.s3EndpointUrl=http://${MINIO_ENDPOINT} \
   --set objectStorage.s3AccessKeyId=minio \
   --set objectStorage.s3SecretAccessKey=minio123 \
   strangiato/mlflow-server

@@ -33,8 +33,12 @@ if [ -z "$DSPA_HOST" ]; then
   exit 1
 fi
 
+python setup_storage_component.py
+python get_images_dataset_component.py
 python train_yolo_component.py
-python train.py $TOKEN $DSPA_HOST
+python upload_model_component.py
+python upload_experiment_report_component.py
+python train_yolo.py $TOKEN $DSPA_HOST
 
 
 

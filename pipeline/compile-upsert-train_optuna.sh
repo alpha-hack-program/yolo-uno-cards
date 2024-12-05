@@ -33,8 +33,7 @@ if [ -z "$DSPA_HOST" ]; then
   exit 1
 fi
 
-python train_yolo_component.py
-python train.py $TOKEN $DSPA_HOST
+python train_optuna.py $TOKEN $DSPA_HOST
 
 
 
