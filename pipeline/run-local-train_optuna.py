@@ -3,27 +3,8 @@
 # pip install -r requirements-local.txt
 
 import os
-import sys
 
-from typing import Dict
-
-from git import Optional
-from jmespath import search
-from kubernetes import client, config
-
-import kfp
-
-from kfp import kubernetes
-from kfp import compiler
-from kfp import dsl
-
-from kfp.dsl import Input, Output, Metrics, OutputPath
-
-from kfp import local
-
-# from train_optuna import generate_search_space
-
-local.init(runner=local.SubprocessRunner())
+from typing import Dict, Optional
 
 os.environ['AWS_ACCESS_KEY_ID'] = 'minio'
 os.environ['AWS_SECRET_ACCESS_KEY'] = 'minio123'
@@ -154,7 +135,6 @@ def train_model_optuna(
     images_dataset_pvc_size_in_gi: int = 5,
 ):
     import os
-    import time
     import yaml
     import re
 
@@ -163,6 +143,10 @@ def train_model_optuna(
     import boto3
     import botocore
     import os
+
+    from kfp import client as kfp_cli
+
+    from kubernetes import client as k8s_cli, config as k8s_conf
 
     aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
     aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -187,9 +171,9 @@ def train_model_optuna(
     def get_route_host(route_name: str):
         # Load in-cluster Kubernetes configuration but if it fails, load local configuration
         try:
-            config.load_incluster_config()
-        except config.config_exception.ConfigException:
-            config.load_kube_config()
+            k8s_conf.load_incluster_config()
+        except k8s_conf.config_exception.ConfigException:
+            k8s_conf.load_kube_config()
 
         # Get token path from environment or default to kubernetes token location
         NAMESPACE_PATH = os.environ.get("NAMESPACE_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -201,7 +185,7 @@ def train_model_optuna(
         print(f"namespace: {namespace}")
 
         # Create Kubernetes API client
-        api_instance = client.CustomObjectsApi()
+        api_instance = k8s_cli.CustomObjectsApi()
 
         try:
             # Retrieve the route object
@@ -221,13 +205,13 @@ def train_model_optuna(
             print(f"Error: {e}")
             return None
 
-    def get_pipeline_id_by_name(client: kfp.Client, pipeline_name: str):
+    def get_pipeline_id_by_name(client: kfp_cli.Client, pipeline_name: str):
         return client.get_pipeline_id(pipeline_name)
     
-    def get_pipeline(client: kfp.Client, pipeline_id: str):
+    def get_pipeline(client: kfp_cli.Client, pipeline_id: str):
         return client.get_pipeline(pipeline_id)
 
-    def get_latest_pipeline_version_id(client: kfp.Client, pipeline_id: str) -> Optional[str]:
+    def get_latest_pipeline_version_id(client: kfp_cli.Client, pipeline_id: str) -> Optional[str]:
         pipeline_versions = client.list_pipeline_versions(
             pipeline_id=pipeline_id,
             sort_by="created_at desc",
@@ -241,13 +225,13 @@ def train_model_optuna(
             return None
 
     # Function that create a kpf experiment and returns the id
-    def create_experiment(client: kfp.Client, experiment_name: str) -> str:
+    def create_experiment(client: kfp_cli.Client, experiment_name: str) -> str:
         experimment = client.create_experiment(name=experiment_name)
         print(f">>>experimment: {experimment}")
         return experimment.experiment_id
 
     # Function that creates a run of a pipeline id in a given experiment id with the latest version of the pipeline
-    def create_run(client: kfp.Client, pipeline_id: str, experiment_id: str, run_name: str, params: dict) -> str:
+    def create_run(client: kfp_cli.Client, pipeline_id: str, experiment_id: str, run_name: str, params: dict) -> str:
         pipeline_version_id = get_latest_pipeline_version_id(client, pipeline_id)
         print(f">>>pipeline_version_id: {pipeline_version_id}")
         if pipeline_version_id is None:
@@ -358,6 +342,7 @@ def train_model_optuna(
         params["models_root_folder"] = models_root_folder
         params["images_dataset_pvc_name"] = images_dataset_pvc_name
         params["images_dataset_pvc_size_in_gi"] = images_dataset_pvc_size_in_gi
+        params["model_name"] = model_name
 
         print(f"params: {params}")
 
@@ -365,7 +350,7 @@ def train_model_optuna(
         metric_name = "training/map"
         metric_value = 0.0
         try:
-            client = kfp.Client(host=kfp_endpoint, existing_token=token)
+            client = kfp_cli.Client(host=kfp_endpoint, existing_token=token)
 
             # Get the pipeline by name
             print(f">>> Pipeline name: {pipeline_name}")
@@ -457,7 +442,7 @@ import time
 experiment_name_prefix="exp-002"
 experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
 train_model_task = train_model_optuna(
-        model_name="model_name",
+        model_name="yolov8n",
         n_trials=2,
         search_space=generate_search_space_task,
         experiment_name=experiment_name,
