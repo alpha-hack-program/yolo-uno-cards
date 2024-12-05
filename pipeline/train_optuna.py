@@ -17,8 +17,10 @@ DATASETS_CONNECTION_SECRET = "aws-connection-datasets"
 MODELS_CONNECTION_SECRET = "aws-connection-models"
 
 BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
+
 KFP_PIP_VERSION="2.8.0"
 K8S_PIP_VERSION="23.6.0"
+OPTUNA_PIP_VERSION="4.1.0"
 
 # This component checks the kfp env
 @dsl.component(
@@ -62,7 +64,7 @@ def check_env() -> bool:
 #   low: 0.0
 #   high: 0.1
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
+    base_image=BASE_IMAGE,
     packages_to_install=["load_dotenv==0.1.0"]
 )
 def generate_search_space(
@@ -153,8 +155,8 @@ def generate_search_space(
 # - model_name_output: The output path for the trained model name.
 # - results_output_metrics: The output for the training results metrics.
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
-    packages_to_install=["load_dotenv==0.1.0", "optuna==4.1.0", "kfp[kubernetes]==2.8.0", "kubernetes==23.6.0"]
+    base_image=BASE_IMAGE,
+    packages_to_install=["load_dotenv==0.1.0", f"optuna=={OPTUNA_PIP_VERSION}", f"kfp[kubernetes]=={KFP_PIP_VERSION}", f"kubernetes=={K8S_PIP_VERSION}"]
 )
 def train_model_optuna(
     model_name: str,                    # e.g: yolov8n
@@ -473,14 +475,6 @@ def train_model_optuna(
     print(study.best_value)
     print("\nStudy trials:")
     print(study.trials)
-
-@dsl.component(
-    # base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301",
-    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
-    packages_to_install=["onnx==1.16.1", "onnxruntime==1.18.0", "scikit-learn==1.5.0", "numpy==1.24.3", "pandas==2.2.2"]
-)
-def yield_not_deployed_error():
-    raise ValueError("Model not deployed")
 
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
 # upload the model to another S3 bucket.
