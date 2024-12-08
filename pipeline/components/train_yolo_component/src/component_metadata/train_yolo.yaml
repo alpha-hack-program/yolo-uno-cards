@@ -1,0 +1,230 @@
+# PIPELINE DEFINITION
+# Name: train-yolo
+# Inputs:
+#    batch_size: int
+#    confidence_threshold: float
+#    epochs: int
+#    experiment_name: str
+#    image_size: int
+#    images_dataset_name: str
+#    images_dataset_yaml: str
+#    images_datasets_root_folder: str
+#    iou_threshold: float
+#    label_smoothing: float
+#    learning_rate: float
+#    model_name: str
+#    models_root_folder: str
+#    momentum: float
+#    optimizer: str
+#    root_mount_path: str
+#    run_name: str
+#    tracking_uri: str
+#    weight_decay: float
+# Outputs:
+#    metric_value_output: float
+#    model_name_output: str
+#    results_output_metrics: system.Metrics
+#    train-yolo-results_output_metrics: system.Metrics
+components:
+  comp-train-yolo:
+    executorLabel: exec-train-yolo
+    inputDefinitions:
+      parameters:
+        batch_size:
+          parameterType: NUMBER_INTEGER
+        confidence_threshold:
+          parameterType: NUMBER_DOUBLE
+        epochs:
+          parameterType: NUMBER_INTEGER
+        experiment_name:
+          parameterType: STRING
+        image_size:
+          parameterType: NUMBER_INTEGER
+        images_dataset_name:
+          parameterType: STRING
+        images_dataset_yaml:
+          parameterType: STRING
+        images_datasets_root_folder:
+          parameterType: STRING
+        iou_threshold:
+          parameterType: NUMBER_DOUBLE
+        label_smoothing:
+          parameterType: NUMBER_DOUBLE
+        learning_rate:
+          parameterType: NUMBER_DOUBLE
+        model_name:
+          parameterType: STRING
+        models_root_folder:
+          parameterType: STRING
+        momentum:
+          parameterType: NUMBER_DOUBLE
+        optimizer:
+          parameterType: STRING
+        root_mount_path:
+          parameterType: STRING
+        run_name:
+          parameterType: STRING
+        tracking_uri:
+          parameterType: STRING
+        weight_decay:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        results_output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        metric_value_output:
+          parameterType: NUMBER_DOUBLE
+        model_name_output:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-train-yolo:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_yolo
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'ultralytics==8.3.22'\
+          \ 'load_dotenv==0.1.0' 'numpy==1.26.4' 'mlflow==2.17.1' 'onnxruntime==1.19.2'\
+          \ 'onnxslim==0.1.36' && \"$0\" \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: image-registry.openshift-image-registry.svc:5000/default/train-yolo:latest
+pipelineInfo:
+  name: train-yolo
+root:
+  dag:
+    outputs:
+      artifacts:
+        results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-yolo
+        train-yolo-results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-yolo
+      parameters:
+        metric_value_output:
+          valueFromParameter:
+            outputParameterKey: metric_value_output
+            producerSubtask: train-yolo
+        model_name_output:
+          valueFromParameter:
+            outputParameterKey: model_name_output
+            producerSubtask: train-yolo
+    tasks:
+      train-yolo:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-yolo
+        inputs:
+          parameters:
+            batch_size:
+              componentInputParameter: batch_size
+            confidence_threshold:
+              componentInputParameter: confidence_threshold
+            epochs:
+              componentInputParameter: epochs
+            experiment_name:
+              componentInputParameter: experiment_name
+            image_size:
+              componentInputParameter: image_size
+            images_dataset_name:
+              componentInputParameter: images_dataset_name
+            images_dataset_yaml:
+              componentInputParameter: images_dataset_yaml
+            images_datasets_root_folder:
+              componentInputParameter: images_datasets_root_folder
+            iou_threshold:
+              componentInputParameter: iou_threshold
+            label_smoothing:
+              componentInputParameter: label_smoothing
+            learning_rate:
+              componentInputParameter: learning_rate
+            model_name:
+              componentInputParameter: model_name
+            models_root_folder:
+              componentInputParameter: models_root_folder
+            momentum:
+              componentInputParameter: momentum
+            optimizer:
+              componentInputParameter: optimizer
+            root_mount_path:
+              componentInputParameter: root_mount_path
+            run_name:
+              componentInputParameter: run_name
+            tracking_uri:
+              componentInputParameter: tracking_uri
+            weight_decay:
+              componentInputParameter: weight_decay
+        taskInfo:
+          name: train-yolo
+  inputDefinitions:
+    parameters:
+      batch_size:
+        parameterType: NUMBER_INTEGER
+      confidence_threshold:
+        parameterType: NUMBER_DOUBLE
+      epochs:
+        parameterType: NUMBER_INTEGER
+      experiment_name:
+        parameterType: STRING
+      image_size:
+        parameterType: NUMBER_INTEGER
+      images_dataset_name:
+        parameterType: STRING
+      images_dataset_yaml:
+        parameterType: STRING
+      images_datasets_root_folder:
+        parameterType: STRING
+      iou_threshold:
+        parameterType: NUMBER_DOUBLE
+      label_smoothing:
+        parameterType: NUMBER_DOUBLE
+      learning_rate:
+        parameterType: NUMBER_DOUBLE
+      model_name:
+        parameterType: STRING
+      models_root_folder:
+        parameterType: STRING
+      momentum:
+        parameterType: NUMBER_DOUBLE
+      optimizer:
+        parameterType: STRING
+      root_mount_path:
+        parameterType: STRING
+      run_name:
+        parameterType: STRING
+      tracking_uri:
+        parameterType: STRING
+      weight_decay:
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    artifacts:
+      results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      train-yolo-results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+    parameters:
+      metric_value_output:
+        parameterType: NUMBER_DOUBLE
+      model_name_output:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0

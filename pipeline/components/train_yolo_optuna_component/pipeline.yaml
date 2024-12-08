@@ -1,0 +1,486 @@
+# PIPELINE DEFINITION
+# Name: pipeline
+# Inputs:
+#    batch_size_bounds: str [Default: '8, 16, 32']
+#    batch_size_type: str [Default: 'categorical']
+#    confidence_threshold_bounds: str [Default: '0.001, 0.005']
+#    confidence_threshold_type: str [Default: 'uniform']
+#    epochs_bounds: str [Default: '2']
+#    epochs_type: str [Default: 'categorical']
+#    experiment_name_prefix: str [Default: 'yolo-uno-cards']
+#    image_size_bounds: str [Default: '640']
+#    image_size_type: str [Default: 'categorical']
+#    images_dataset_name: str [Default: 'uno-cards-v1.2']
+#    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
+#    images_dataset_pvc_size_in_gi: int [Default: 5.0]
+#    images_dataset_yaml: str [Default: 'data.yaml']
+#    images_datasets_root_folder: str [Default: 'datasets']
+#    iou_threshold_bounds: str [Default: '0.4, 0.6']
+#    iou_threshold_type: str [Default: 'uniform']
+#    label_smoothing_bounds: str [Default: '0.07, 0.2']
+#    label_smoothing_type: str [Default: 'uniform']
+#    lr_bounds: str [Default: '0.001, 0.01']
+#    lr_type: str [Default: 'float']
+#    model_name: str [Default: 'yolov8n']
+#    models_root_folder: str [Default: 'models']
+#    momentum_bounds: str [Default: '0.9, 0.99']
+#    momentum_type: str [Default: 'uniform']
+#    n_trials: int [Default: 3.0]
+#    optimizer_bounds: str [Default: 'Adam']
+#    optimizer_type: str [Default: 'categorical']
+#    pipeline_name: str [Default: 'train_yolo']
+#    weight_decay_bounds: str [Default: '0.0005, 0.001']
+#    weight_decay_type: str [Default: 'float']
+components:
+  comp-check-env:
+    executorLabel: exec-check-env
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: BOOLEAN
+  comp-generate-search-space:
+    executorLabel: exec-generate-search-space
+    inputDefinitions:
+      parameters:
+        batch_size_bounds:
+          parameterType: STRING
+        batch_size_type:
+          parameterType: STRING
+        confidence_threshold_bounds:
+          parameterType: STRING
+        confidence_threshold_type:
+          parameterType: STRING
+        epochs_bounds:
+          parameterType: STRING
+        epochs_type:
+          parameterType: STRING
+        image_size_bounds:
+          parameterType: STRING
+        image_size_type:
+          parameterType: STRING
+        iou_threshold_bounds:
+          parameterType: STRING
+        iou_threshold_type:
+          parameterType: STRING
+        label_smoothing_bounds:
+          parameterType: STRING
+        label_smoothing_type:
+          parameterType: STRING
+        lr_bounds:
+          parameterType: STRING
+        lr_type:
+          parameterType: STRING
+        momentum_bounds:
+          parameterType: STRING
+        momentum_type:
+          parameterType: STRING
+        optimizer_bounds:
+          parameterType: STRING
+        optimizer_type:
+          parameterType: STRING
+        weight_decay_bounds:
+          parameterType: STRING
+        weight_decay_type:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: STRING
+  comp-train-model-optuna:
+    executorLabel: exec-train-model-optuna
+    inputDefinitions:
+      parameters:
+        experiment_name_prefix:
+          parameterType: STRING
+        images_dataset_name:
+          defaultValue: uno-cards-v1.2
+          isOptional: true
+          parameterType: STRING
+        images_dataset_pvc_name:
+          defaultValue: images-datasets-pvc
+          isOptional: true
+          parameterType: STRING
+        images_dataset_pvc_size_in_gi:
+          defaultValue: 5.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        images_dataset_yaml:
+          defaultValue: data.yaml
+          isOptional: true
+          parameterType: STRING
+        images_datasets_root_folder:
+          defaultValue: datasets
+          isOptional: true
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        models_root_folder:
+          defaultValue: models
+          isOptional: true
+          parameterType: STRING
+        n_trials:
+          parameterType: NUMBER_INTEGER
+        pipeline_name:
+          parameterType: STRING
+        search_space:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-check-env:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - check_env
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp[kubernetes]==2.8.0'\
+          \ 'kubernetes==23.6.0' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef check_env() -> bool:\n\n    try:\n        from kfp import client\
+          \ as kfp_cli\n        print(f\"The package kfp is installed.\")\n\n    \
+          \    try:\n            client = kfp_cli.Client()\n            print(\"kfp.Client()\
+          \ works\")\n            return True\n        except:\n            print(\"\
+          kfp.Client() fails\")\n    except ImportError:\n        print(f\"The package\
+          \ kfp is not installed.\")\n\n    return False\n\n"
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
+    exec-generate-search-space:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - generate_search_space
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.8.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'load_dotenv==0.1.0'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef generate_search_space(\n    epochs_type: str,\n    epochs_bounds:\
+          \ str,\n    lr_type: str,\n    lr_bounds: str,\n    momentum_type: str,\n\
+          \    momentum_bounds: str,\n    weight_decay_type: str,\n    weight_decay_bounds:\
+          \ str,\n    image_size_type: str,\n    image_size_bounds: str,\n    confidence_threshold_type:\
+          \ str,\n    confidence_threshold_bounds: str,\n    iou_threshold_type: str,\n\
+          \    iou_threshold_bounds: str,\n    optimizer_type: str,\n    optimizer_bounds:\
+          \ str,\n    label_smoothing_type: str,\n    label_smoothing_bounds: str,\n\
+          \    batch_size_type: str,\n    batch_size_bounds: str,\n) -> str:\n   \
+          \ def add_to_yaml(yaml_str, param_name, param_type, param_bounds=None):\n\
+          \        yaml_str += f\"{param_name}:\\n  type: {param_type}\\n\"\n    \
+          \    if param_type == \"float\":\n            param_value = [float(x) for\
+          \ x in param_bounds.split(\",\")]\n            yaml_str += f\"  low: {param_value[0]}\\\
+          n  high: {param_value[1]}\\n\"\n        elif param_type == \"categorical\"\
+          :\n            param_value = [x.strip() for x in param_bounds.split(\",\"\
+          )]\n            yaml_str += f\"  choices: {param_value}\\n\"\n        elif\
+          \ param_type == \"uniform\":\n            param_value = [float(x) for x\
+          \ in param_bounds.split(\",\")]\n            yaml_str += f\"  low: {param_value[0]}\\\
+          n  high: {param_value[1]}\\n\"\n        else:\n            raise ValueError(f\"\
+          Invalid parameter type: {param_type}\")\n\n        return yaml_str\n\n \
+          \   yaml_str = \"\"\n\n    if epochs_type is not None:\n        yaml_str\
+          \ = add_to_yaml(yaml_str, \"epochs\", epochs_type, epochs_bounds)\n\n  \
+          \  if lr_type is not None:\n        yaml_str = add_to_yaml(yaml_str, \"\
+          learning_rate\", lr_type, lr_bounds)\n\n    if momentum_type is not None:\n\
+          \        yaml_str = add_to_yaml(yaml_str, \"momentum\", momentum_type, momentum_bounds)\n\
+          \n    if weight_decay_type is not None:\n        yaml_str = add_to_yaml(yaml_str,\
+          \ \"weight_decay\", weight_decay_type, weight_decay_bounds)\n\n    if image_size_type\
+          \ is not None:\n        yaml_str = add_to_yaml(yaml_str, \"image_size\"\
+          , image_size_type, image_size_bounds)\n\n    if confidence_threshold_type\
+          \ is not None:\n        yaml_str = add_to_yaml(yaml_str, \"confidence_threshold\"\
+          , confidence_threshold_type, confidence_threshold_bounds)\n\n    if iou_threshold_type\
+          \ is not None:\n        yaml_str = add_to_yaml(yaml_str, \"iou_threshold\"\
+          , iou_threshold_type, iou_threshold_bounds)\n\n    if optimizer_type is\
+          \ not None:\n        yaml_str = add_to_yaml(yaml_str, \"optimizer\", optimizer_type,\
+          \ optimizer_bounds)\n\n    if label_smoothing_type is not None:\n      \
+          \  yaml_str = add_to_yaml(yaml_str, \"label_smoothing\", label_smoothing_type,\
+          \ label_smoothing_bounds)\n\n    if batch_size_type is not None:\n     \
+          \   yaml_str = add_to_yaml(yaml_str, \"batch_size\", batch_size_type, batch_size_bounds)\n\
+          \n    return yaml_str\n\n"
+        image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
+    exec-train-model-optuna:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model_optuna
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'load_dotenv==0.1.0'\
+          \ 'optuna==4.1.0' 'kfp[kubernetes]==2.8.0' 'kubernetes==23.6.0' && \"$0\"\
+          \ \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        env:
+        - name: EXPERIMENT_REPORTS_FOLDER_S3_KEY
+          value: experiment-reports
+        image: image-registry.openshift-image-registry.svc:5000/default/train-yolo-optuna:latest
+pipelineInfo:
+  name: pipeline
+root:
+  dag:
+    tasks:
+      check-env:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-check-env
+        taskInfo:
+          name: check-env
+      generate-search-space:
+        cachingOptions: {}
+        componentRef:
+          name: comp-generate-search-space
+        inputs:
+          parameters:
+            batch_size_bounds:
+              componentInputParameter: batch_size_bounds
+            batch_size_type:
+              componentInputParameter: batch_size_type
+            confidence_threshold_bounds:
+              componentInputParameter: confidence_threshold_bounds
+            confidence_threshold_type:
+              componentInputParameter: confidence_threshold_type
+            epochs_bounds:
+              componentInputParameter: epochs_bounds
+            epochs_type:
+              componentInputParameter: epochs_type
+            image_size_bounds:
+              componentInputParameter: image_size_bounds
+            image_size_type:
+              componentInputParameter: image_size_type
+            iou_threshold_bounds:
+              componentInputParameter: iou_threshold_bounds
+            iou_threshold_type:
+              componentInputParameter: iou_threshold_type
+            label_smoothing_bounds:
+              componentInputParameter: label_smoothing_bounds
+            label_smoothing_type:
+              componentInputParameter: label_smoothing_type
+            lr_bounds:
+              componentInputParameter: lr_bounds
+            lr_type:
+              componentInputParameter: lr_type
+            momentum_bounds:
+              componentInputParameter: momentum_bounds
+            momentum_type:
+              componentInputParameter: momentum_type
+            optimizer_bounds:
+              componentInputParameter: optimizer_bounds
+            optimizer_type:
+              componentInputParameter: optimizer_type
+            weight_decay_bounds:
+              componentInputParameter: weight_decay_bounds
+            weight_decay_type:
+              componentInputParameter: weight_decay_type
+        taskInfo:
+          name: generate-search-space
+      train-model-optuna:
+        cachingOptions: {}
+        componentRef:
+          name: comp-train-model-optuna
+        dependentTasks:
+        - check-env
+        - generate-search-space
+        inputs:
+          parameters:
+            experiment_name_prefix:
+              componentInputParameter: experiment_name_prefix
+            images_dataset_name:
+              componentInputParameter: images_dataset_name
+            images_dataset_pvc_name:
+              componentInputParameter: images_dataset_pvc_name
+            images_dataset_pvc_size_in_gi:
+              componentInputParameter: images_dataset_pvc_size_in_gi
+            images_dataset_yaml:
+              componentInputParameter: images_dataset_yaml
+            images_datasets_root_folder:
+              componentInputParameter: images_datasets_root_folder
+            model_name:
+              componentInputParameter: model_name
+            models_root_folder:
+              componentInputParameter: models_root_folder
+            n_trials:
+              componentInputParameter: n_trials
+            pipeline_name:
+              componentInputParameter: pipeline_name
+            search_space:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: generate-search-space
+        taskInfo:
+          name: train-model-optuna
+  inputDefinitions:
+    parameters:
+      batch_size_bounds:
+        defaultValue: 8, 16, 32
+        isOptional: true
+        parameterType: STRING
+      batch_size_type:
+        defaultValue: categorical
+        isOptional: true
+        parameterType: STRING
+      confidence_threshold_bounds:
+        defaultValue: 0.001, 0.005
+        isOptional: true
+        parameterType: STRING
+      confidence_threshold_type:
+        defaultValue: uniform
+        isOptional: true
+        parameterType: STRING
+      epochs_bounds:
+        defaultValue: '2'
+        isOptional: true
+        parameterType: STRING
+      epochs_type:
+        defaultValue: categorical
+        isOptional: true
+        parameterType: STRING
+      experiment_name_prefix:
+        defaultValue: yolo-uno-cards
+        isOptional: true
+        parameterType: STRING
+      image_size_bounds:
+        defaultValue: '640'
+        isOptional: true
+        parameterType: STRING
+      image_size_type:
+        defaultValue: categorical
+        isOptional: true
+        parameterType: STRING
+      images_dataset_name:
+        defaultValue: uno-cards-v1.2
+        isOptional: true
+        parameterType: STRING
+      images_dataset_pvc_name:
+        defaultValue: images-datasets-pvc
+        isOptional: true
+        parameterType: STRING
+      images_dataset_pvc_size_in_gi:
+        defaultValue: 5.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      images_dataset_yaml:
+        defaultValue: data.yaml
+        isOptional: true
+        parameterType: STRING
+      images_datasets_root_folder:
+        defaultValue: datasets
+        isOptional: true
+        parameterType: STRING
+      iou_threshold_bounds:
+        defaultValue: 0.4, 0.6
+        isOptional: true
+        parameterType: STRING
+      iou_threshold_type:
+        defaultValue: uniform
+        isOptional: true
+        parameterType: STRING
+      label_smoothing_bounds:
+        defaultValue: 0.07, 0.2
+        isOptional: true
+        parameterType: STRING
+      label_smoothing_type:
+        defaultValue: uniform
+        isOptional: true
+        parameterType: STRING
+      lr_bounds:
+        defaultValue: 0.001, 0.01
+        isOptional: true
+        parameterType: STRING
+      lr_type:
+        defaultValue: float
+        isOptional: true
+        parameterType: STRING
+      model_name:
+        defaultValue: yolov8n
+        isOptional: true
+        parameterType: STRING
+      models_root_folder:
+        defaultValue: models
+        isOptional: true
+        parameterType: STRING
+      momentum_bounds:
+        defaultValue: 0.9, 0.99
+        isOptional: true
+        parameterType: STRING
+      momentum_type:
+        defaultValue: uniform
+        isOptional: true
+        parameterType: STRING
+      n_trials:
+        defaultValue: 3.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      optimizer_bounds:
+        defaultValue: Adam
+        isOptional: true
+        parameterType: STRING
+      optimizer_type:
+        defaultValue: categorical
+        isOptional: true
+        parameterType: STRING
+      pipeline_name:
+        defaultValue: train_yolo
+        isOptional: true
+        parameterType: STRING
+      weight_decay_bounds:
+        defaultValue: 0.0005, 0.001
+        isOptional: true
+        parameterType: STRING
+      weight_decay_type:
+        defaultValue: float
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0
+---
+platforms:
+  kubernetes:
+    deploymentSpec:
+      executors:
+        exec-train-model-optuna:
+          secretAsEnv:
+          - keyToEnv:
+            - envVar: AWS_ACCESS_KEY_ID
+              secretKey: AWS_ACCESS_KEY_ID
+            - envVar: AWS_SECRET_ACCESS_KEY
+              secretKey: AWS_SECRET_ACCESS_KEY
+            - envVar: AWS_DEFAULT_REGION
+              secretKey: AWS_DEFAULT_REGION
+            - envVar: AWS_S3_BUCKET
+              secretKey: AWS_S3_BUCKET
+            - envVar: AWS_S3_ENDPOINT
+              secretKey: AWS_S3_ENDPOINT
+            secretName: aws-connection-models

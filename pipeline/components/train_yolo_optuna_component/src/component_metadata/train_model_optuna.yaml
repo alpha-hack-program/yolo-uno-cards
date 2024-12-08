@@ -1,0 +1,148 @@
+# PIPELINE DEFINITION
+# Name: train-model-optuna
+# Inputs:
+#    experiment_name_prefix: str
+#    images_dataset_name: str [Default: 'uno-cards-v1.2']
+#    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
+#    images_dataset_pvc_size_in_gi: int [Default: 5.0]
+#    images_dataset_yaml: str [Default: 'data.yaml']
+#    images_datasets_root_folder: str [Default: 'datasets']
+#    model_name: str
+#    models_root_folder: str [Default: 'models']
+#    n_trials: int
+#    pipeline_name: str
+#    search_space: str
+components:
+  comp-train-model-optuna:
+    executorLabel: exec-train-model-optuna
+    inputDefinitions:
+      parameters:
+        experiment_name_prefix:
+          parameterType: STRING
+        images_dataset_name:
+          defaultValue: uno-cards-v1.2
+          isOptional: true
+          parameterType: STRING
+        images_dataset_pvc_name:
+          defaultValue: images-datasets-pvc
+          isOptional: true
+          parameterType: STRING
+        images_dataset_pvc_size_in_gi:
+          defaultValue: 5.0
+          isOptional: true
+          parameterType: NUMBER_INTEGER
+        images_dataset_yaml:
+          defaultValue: data.yaml
+          isOptional: true
+          parameterType: STRING
+        images_datasets_root_folder:
+          defaultValue: datasets
+          isOptional: true
+          parameterType: STRING
+        model_name:
+          parameterType: STRING
+        models_root_folder:
+          defaultValue: models
+          isOptional: true
+          parameterType: STRING
+        n_trials:
+          parameterType: NUMBER_INTEGER
+        pipeline_name:
+          parameterType: STRING
+        search_space:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-train-model-optuna:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model_optuna
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'load_dotenv==0.1.0'\
+          \ 'optuna==4.1.0' 'kfp[kubernetes]==2.8.0' 'kubernetes==23.6.0' && \"$0\"\
+          \ \"$@\"\n"
+        - python3
+        - -m
+        - kfp.dsl.executor_main
+        image: image-registry.openshift-image-registry.svc:5000/default/train-yolo-optuna:latest
+pipelineInfo:
+  name: train-model-optuna
+root:
+  dag:
+    tasks:
+      train-model-optuna:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model-optuna
+        inputs:
+          parameters:
+            experiment_name_prefix:
+              componentInputParameter: experiment_name_prefix
+            images_dataset_name:
+              componentInputParameter: images_dataset_name
+            images_dataset_pvc_name:
+              componentInputParameter: images_dataset_pvc_name
+            images_dataset_pvc_size_in_gi:
+              componentInputParameter: images_dataset_pvc_size_in_gi
+            images_dataset_yaml:
+              componentInputParameter: images_dataset_yaml
+            images_datasets_root_folder:
+              componentInputParameter: images_datasets_root_folder
+            model_name:
+              componentInputParameter: model_name
+            models_root_folder:
+              componentInputParameter: models_root_folder
+            n_trials:
+              componentInputParameter: n_trials
+            pipeline_name:
+              componentInputParameter: pipeline_name
+            search_space:
+              componentInputParameter: search_space
+        taskInfo:
+          name: train-model-optuna
+  inputDefinitions:
+    parameters:
+      experiment_name_prefix:
+        parameterType: STRING
+      images_dataset_name:
+        defaultValue: uno-cards-v1.2
+        isOptional: true
+        parameterType: STRING
+      images_dataset_pvc_name:
+        defaultValue: images-datasets-pvc
+        isOptional: true
+        parameterType: STRING
+      images_dataset_pvc_size_in_gi:
+        defaultValue: 5.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      images_dataset_yaml:
+        defaultValue: data.yaml
+        isOptional: true
+        parameterType: STRING
+      images_datasets_root_folder:
+        defaultValue: datasets
+        isOptional: true
+        parameterType: STRING
+      model_name:
+        parameterType: STRING
+      models_root_folder:
+        defaultValue: models
+        isOptional: true
+        parameterType: STRING
+      n_trials:
+        parameterType: NUMBER_INTEGER
+      pipeline_name:
+        parameterType: STRING
+      search_space:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.8.0
