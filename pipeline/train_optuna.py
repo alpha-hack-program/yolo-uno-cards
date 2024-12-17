@@ -368,11 +368,12 @@ def train_model_optuna(
                 raise ValueError(f"Unsupported parameter type: {param_type}")
 
         # run_name compose of the experiment name and the optuna 'trial' number
-        run_name = f"{experiment_name}-trial-{trial.number}"
+        run_name = f"{experiment_name}-{model_name}-trial-{trial.number}"
         print(f"Run name: {run_name}")
         
         # Add experiment_name, here is the experiment name is the run_name 
         params["experiment_name"] = run_name
+        params["run_name"] = run_name
 
         # Add parmaters to set the dataset to use, etc.
         params["images_dataset_name"] = images_dataset_name
@@ -480,7 +481,7 @@ def train_model_optuna(
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    experiment_name_prefix: str = "yolo-uno-cards",
+    experiment_name_prefix: str = "uno-cards",
     model_name: str = "yolov8n", 
     n_trials: int = 3,
     epochs_type: str = "categorical",

@@ -122,10 +122,10 @@ def pipeline(
     train_model_task.after(get_images_dataset_task)
     train_model_task.after(setup_shm_task)
     # TODO externalize these values
-    train_model_task.set_memory_request("12Gi")
-    train_model_task.set_cpu_request("6")
-    train_model_task.set_memory_limit("12Gi")
-    train_model_task.set_cpu_limit("6")
+    # train_model_task.set_memory_request("12Gi")
+    # train_model_task.set_cpu_request("6")
+    # train_model_task.set_memory_limit("12Gi")
+    # train_model_task.set_cpu_limit("6")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
     # kubernetes.add_node_selector(
@@ -154,7 +154,19 @@ def pipeline(
     # Upload the experiment report
     upload_experiment_report_component_task = upload_experiment_report_component(
         experiment_name=experiment_name,
-        metric_value=metric_value
+        run_name=run_name,
+        metric_value=metric_value,
+        model_name=model_name, 
+        image_size=image_size, 
+        epochs=epochs,
+        batch_size=batch_size,
+        optimizer=optimizer,
+        learning_rate=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        confidence_threshold=confidence_threshold,
+        iou_threshold=iou_threshold,
+        label_smoothing=label_smoothing,
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 

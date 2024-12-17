@@ -99,7 +99,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: image-registry.openshift-image-registry.svc:5000/default/train-yolo:latest
+        image: quay.io/atarazana/train_yolo:latest
 pipelineInfo:
   name: train-yolo
 root:

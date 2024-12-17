@@ -16,7 +16,7 @@ build: ## Build the project
 	cargo build --bin report --features="cli"
 
 run: ## Run the project
-	cargo run -- --num1 1.2 --num2 0.5 --output output
+	cargo run -- --num1 1.2 --num2 4.1 --output output
 
 test: ## Run the tests
 	cargo test

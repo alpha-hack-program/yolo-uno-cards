@@ -117,7 +117,7 @@ def train_yolo(
     model = YOLO(f'{model_name}.pt')
 
     # Set the run name
-    train_run_name = f"{run_name}-{model_name}-train-{int(time.time())}"
+    train_run_name = f"{run_name}-train"
     print(f"Current run name: {train_run_name}")
 
     # Dataset yaml path
@@ -132,6 +132,7 @@ def train_yolo(
     # Start the MLflow run for training
     with mlflow.start_run(run_name=train_run_name) as training_mlrun:
         mlflow.log_param("dataset_file", f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}")
+        mlflow.log_param("model_name", model_name)
         mlflow.log_param("dataset_name", images_dataset_name)
         mlflow.log_param("datasets_root_folder", images_datasets_root_folder)
         mlflow.log_param("dataset_yaml", images_dataset_yaml)
@@ -170,7 +171,7 @@ def train_yolo(
 
         # Save the trained model
         print(f"Saving model to {models_folder}")
-        trained_model_name = f"model-{train_run_name}"
+        trained_model_name = f"{train_run_name}"
         print(f"Trained model name: {trained_model_name}")
         trained_model_pt_path = os.path.join(models_folder, f"{trained_model_name}.pt")
         print(f"Saving model to {trained_model_pt_path}")
@@ -185,8 +186,8 @@ def train_yolo(
         mlflow.end_run()
 
         # Start the MLflow run for validation
-        val_run_name = f"{run_name}-{model_name}-val-{int(time.time())}"
-        print(f"Current run name: {train_run_name}")
+        val_run_name = f"{run_name}-val"
+        print(f"Current run name: {val_run_name}")
         with mlflow.start_run(run_name=val_run_name):
             # Validate the model    
             validation_results = model.val()

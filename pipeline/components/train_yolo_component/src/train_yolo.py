@@ -13,7 +13,7 @@ NAMESPACE = os.environ.get("NAMESPACE", "default")
 
 REGISTRY=os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.svc:5000/{NAMESPACE}")
 
-TARGET_IMAGE=f"{REGISTRY}/train-yolo:latest"
+TARGET_IMAGE=f"{REGISTRY}/train_yolo:latest"
 
 ULTRALYTICS_PIP_VERSION="8.3.22"
 LOAD_DOTENV_PIP_VERSION="0.1.0"

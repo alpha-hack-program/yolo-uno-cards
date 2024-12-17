@@ -1,4 +1,5 @@
 use clap::Parser;
+use rust_decimal::Decimal;
 
 /// Simple program to multiply two floating-point numbers
 #[derive(Parser, Debug)]
@@ -21,7 +22,13 @@ fn main() {
     let args = Args::parse();
 
     // Multiply the two numbers
-    let result = args.num1 * args.num2;
+
+    let num1 = Decimal::from_f64_retain(args.num1).unwrap();
+    let num2 = Decimal::from_f64_retain(args.num2).unwrap();
+
+    let result = num1 * num2;
+
+    println!("Result: {} * {} = {:?}", num1, num2, result);
 
     // Write the result to the output file
     std::fs::write(&args.output, result.to_string())

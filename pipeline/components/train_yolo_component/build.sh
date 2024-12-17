@@ -1,6 +1,8 @@
 #!/bin/sh
 
-COMPONENT_NAME=train_yolo
+export COMPONENT_NAME=train_yolo
+export ORG=atarazana
+export REGISTRY=quay.io/${ORG}
 
 kfp component build src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --overwrite-dockerfile --no-build-image
 

@@ -18,7 +18,19 @@ from kfp.dsl import Input, component
 )
 def upload_experiment_report(
     experiment_name: str,
-    metric_value: float
+    run_name: str,
+    metric_value: float,
+    model_name: str, 
+    image_size: int, 
+    epochs: int, 
+    batch_size: int,
+    optimizer: str,
+    learning_rate: float,
+    momentum: float,
+    weight_decay: float,
+    confidence_threshold: float,
+    iou_threshold: float,
+    label_smoothing: float,
 ):
     import boto3
     import botocore
@@ -76,7 +88,21 @@ def upload_experiment_report(
     experiment_report_file_path = f'{local_tmp_dir}/{experiment_report_file_name}'
 
     # Write the report to a string
-    experiment_report_str = f"report:\n  experiment_name: {experiment_name}\n  metric_value: {metric_value}"
+    experiment_report_str = f"report:\n  experiment_name: {experiment_name}"
+    experiment_report_str += f"\n  run_name: {run_name}"
+    experiment_report_str += f"\n  metric_value: {metric_value}"
+    experiment_report_str += f"\n  params:"
+    experiment_report_str += f"\n    model_name: {model_name}"
+    experiment_report_str += f"\n    image_size: {image_size}"
+    experiment_report_str += f"\n    epochs: {epochs}"
+    experiment_report_str += f"\n    batch_size: {batch_size}"
+    experiment_report_str += f"\n    optimizer: {optimizer}"
+    experiment_report_str += f"\n    learning_rate: {learning_rate}"
+    experiment_report_str += f"\n    momentum: {momentum}"
+    experiment_report_str += f"\n    weight_decay: {weight_decay}"
+    experiment_report_str += f"\n    confidence_threshold: {confidence_threshold}"
+    experiment_report_str += f"\n    iou_threshold: {iou_threshold}"
+    experiment_report_str += f"\n    label_smoothing: {label_smoothing}"
 
     # Write the report to a file
     with open(experiment_report_file_path, 'w') as f:
