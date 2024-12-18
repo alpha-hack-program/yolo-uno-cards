@@ -93,17 +93,17 @@ spec:
         - name: pipelines.connection.type
           value: "s3"
         - name: pipelines.connection.awsAccessKeyId
-          value: "${MINIO_ACCESS_KEY}"
+          value: "${PIPELINES_ACCESS_KEY}"
         - name: pipelines.connection.awsSecretAccessKey
-          value: "${MINIO_SECRET_KEY}"
+          value: "${PIPELINES_SECRET_KEY}"
         - name: pipelines.connection.awsDefaultRegion
           value: "none"
         - name: pipelines.connection.awsS3Bucket
-          value: "pipelines"
+          value: "${PIPELINES_BUCKET_NAME}"
         - name: pipelines.connection.scheme
-          value: "http"
+          value: "${S3_SCHEME}"
         - name: pipelines.connection.awsS3Endpoint
-          value: "${MINIO_ENDPOINT}"
+          value: "${S3_ENDPOINT}"
 
         - name: datasets.connection.name
           value: "datasets"
@@ -112,17 +112,17 @@ spec:
         - name: datasets.connection.type
           value: "s3"
         - name: datasets.connection.awsAccessKeyId
-          value: "${MINIO_ACCESS_KEY}"
+          value: "${DATASETS_ACCESS_KEY}"
         - name: datasets.connection.awsSecretAccessKey
-          value: "${MINIO_SECRET_KEY}"
+          value: "${DATASETS_SECRET_KEY}"
         - name: datasets.connection.awsDefaultRegion
           value: "none"
         - name: datasets.connection.awsS3Bucket
-          value: "datasets"
+          value: "${DATASETS_BUCKET_NAME}"
         - name: pipelines.connection.scheme
-          value: "http"
+          value: "${S3_SCHEME}"
         - name: datasets.connection.awsS3Endpoint
-          value: "${MINIO_ENDPOINT}"
+          value: "${S3_ENDPOINT}"
 
         - name: models.connection.name
           value: "models"
@@ -131,17 +131,17 @@ spec:
         - name: models.connection.type
           value: "s3"
         - name: models.connection.awsAccessKeyId
-          value: "${MINIO_ACCESS_KEY}"
+          value: "${MODELS_ACCESS_KEY}"
         - name: models.connection.awsSecretAccessKey
-          value: "${MINIO_SECRET_KEY}"
+          value: "${MODELS_SECRET_KEY}"
         - name: models.connection.awsDefaultRegion
           value: "none"
         - name: models.connection.awsS3Bucket
-          value: "models"
+          value: "${MODELS_BUCKET_NAME}"
         - name: pipelines.connection.scheme
-          value: "http"
+          value: "${S3_SCHEME}"
         - name: models.connection.awsS3Endpoint
-          value: "${MINIO_ENDPOINT}"
+          value: "${S3_ENDPOINT}"
   syncPolicy:
     automated:
       selfHeal: true      
@@ -159,8 +159,8 @@ done
 helm repo add strangiato https://strangiato.github.io/helm-charts/
 helm upgrade -n ${DATA_SCIENCE_PROJECT_NAMESPACE} -i mlflow-server \
   --set objectStorage.objectBucketClaim.enabled=false \
-  --set objectStorage.mlflowBucketName=mlflow \
-  --set objectStorage.s3EndpointUrl=http://${MINIO_ENDPOINT} \
-  --set objectStorage.s3AccessKeyId=minio \
-  --set objectStorage.s3SecretAccessKey=minio123 \
+  --set objectStorage.mlflowBucketName=${MLFLOW_BUCKET_NAME} \
+  --set objectStorage.s3EndpointUrl=${S3_SCHEME}://${S3_ENDPOINT} \
+  --set objectStorage.s3AccessKeyId=${MLFLOW_ACCESS_KEY} \
+  --set objectStorage.s3SecretAccessKey=${MLFLOW_SECRET_KEY} \
   strangiato/mlflow-server
