@@ -1,0 +1,24 @@
+name: MultiplyTwoNumbers
+description: A Kubeflow component written in Rust that multiplies two numbers.
+inputs:
+- name: num1
+  type: Float
+  description: The first number.
+- name: num2
+  type: Float
+  description: The second number.
+outputs:
+- name: result
+  type: Artifact
+  description: The file containing the multiplication result.
+implementation:
+  container:
+    image: quay.io/atarazana/rust_calc:latest
+    command:
+    - rust_calc
+    - --num1
+    - {inputValue: num1}
+    - --num2
+    - {inputValue: num2}
+    - --output
+    - {outputPath: result}
