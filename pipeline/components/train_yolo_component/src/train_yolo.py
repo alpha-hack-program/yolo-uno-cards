@@ -6,8 +6,8 @@ from kfp import compiler
 from kfp.dsl import Output, Metrics, OutputPath
 from kfp import dsl
 
-# BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
-BASE_IMAGE="python:3.11-slim-bullseye"
+BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
+# BASE_IMAGE="python:3.11-slim-bullseye"
 
 NAMESPACE = os.environ.get("NAMESPACE", "default")
 

@@ -122,23 +122,23 @@ def pipeline(
     train_model_task.after(get_images_dataset_task)
     train_model_task.after(setup_shm_task)
     # TODO externalize these values
-    # train_model_task.set_memory_request("12Gi")
-    # train_model_task.set_cpu_request("6")
-    # train_model_task.set_memory_limit("12Gi")
-    # train_model_task.set_cpu_limit("6")
+    train_model_task.set_memory_request("6Gi")
+    train_model_task.set_cpu_request("2")
+    train_model_task.set_memory_limit("8Gi")
+    train_model_task.set_cpu_limit("4")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
-    # kubernetes.add_node_selector(
-    #     train_model_task,
-    #     label_key='nvidia.com/gpu.product',
-    #     label_value='NVIDIA-A10G'
-    # )
-    # kubernetes.add_toleration(
-    #     train_model_task,
-    #     key='nvidia.com/gpu',
-    #     operator='Exists',
-    #     effect='NoSchedule'
-    # )
+    kubernetes.add_node_selector(
+        train_model_task,
+        label_key='nvidia.com/gpu.product',
+        label_value='NVIDIA-A10G'
+    )
+    kubernetes.add_toleration(
+        train_model_task,
+        key='nvidia.com/gpu',
+        operator='Exists',
+        effect='NoSchedule'
+    )
 
     # Extract model name and metric value
     model_name = train_model_task.outputs["model_name_output"]

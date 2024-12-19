@@ -4,8 +4,6 @@ import os
 import sys
 import time
 
-from kubernetes import client, config
-
 import kfp
 
 from kfp import compiler
@@ -13,7 +11,12 @@ from kfp import dsl
 
 from kfp import kubernetes
 
+from src.utils import get_pipeline_id_by_name, get_route_host, get_token
+
 from src.train_yolo_optuna import train_model_optuna
+
+COMPONENT_NAME=os.getenv("COMPONENT_NAME")
+print(f"COMPONENT_NAME: {COMPONENT_NAME}")
 
 DATASETS_CONNECTION_SECRET = "aws-connection-datasets"
 MODELS_CONNECTION_SECRET = "aws-connection-models"
@@ -23,6 +26,7 @@ BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
 KFP_PIP_VERSION="2.8.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
+LOAD_DOTENV_PIP_VERSION="0.1.0"
 
 # This component checks the kfp env
 @dsl.component(
@@ -67,7 +71,7 @@ def check_env() -> bool:
 #   high: 0.1
 @dsl.component(
     base_image=BASE_IMAGE,
-    packages_to_install=["load_dotenv==0.1.0"]
+    packages_to_install=[f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}"]
 )
 def generate_search_space(
     epochs_type: str,
@@ -232,10 +236,67 @@ def pipeline(
     )
 
 if __name__ == '__main__':
-        
+    import time
+    import sys
+    import os
+
+    from kfp import compiler
+
     pipeline_package_path = __file__.replace('.py', '.yaml')
 
     compiler.Compiler().compile(
         pipeline_func=pipeline,
-        package_path=pipeline_package_path
+        package_path=pipeline_package_path,
     )
+
+    # Take token and kfp_endpoint as optional command-line arguments
+    token = sys.argv[1] if len(sys.argv) > 1 else None
+    kfp_endpoint = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if not token:
+        print("Token endpoint not provided finding it automatically.")
+        token = get_token()
+
+    if not kfp_endpoint:
+        print("KFP endpoint not provided finding it automatically.")
+        kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
+
+    # Pipeline name
+    # pipeline_name = os.path.basename(__file__).replace('.py', '')
+    pipeline_name=f"{COMPONENT_NAME}_pl"
+
+    # If both kfp_endpoint and token are provided, upload the pipeline
+    if kfp_endpoint and token:
+        client = kfp.Client(host=kfp_endpoint, existing_token=token)
+
+        # If endpoint doesn't have a protocol (http or https), add https
+        if not kfp_endpoint.startswith("http"):
+            kfp_endpoint = f"https://{kfp_endpoint}"
+
+        try:
+            # Get the pipeline by name
+            print(f"Pipeline name: {pipeline_name}")
+            pipeline_id = get_pipeline_id_by_name(client, pipeline_name)
+            if pipeline_id:
+                print(f"Pipeline {pipeline_id} already exists. Uploading a new version.")
+                # Upload a new version of the pipeline with a version name equal to the pipeline package path plus a timestamp
+                pipeline_version_name=f"{pipeline_name}-{int(time.time())}"
+                client.upload_pipeline_version(
+                    pipeline_package_path=pipeline_package_path,
+                    pipeline_id=pipeline_id,
+                    pipeline_version_name=pipeline_version_name
+                )
+                print(f"Pipeline version uploaded successfully to {kfp_endpoint}")
+            else:
+                print(f"Pipeline {pipeline_name} does not exist. Uploading a new pipeline.")
+                print(f"Pipeline package path: {pipeline_package_path}")
+                # Upload the compiled pipeline
+                client.upload_pipeline(
+                    pipeline_package_path=pipeline_package_path,
+                    pipeline_name=pipeline_name
+                )
+                print(f"Pipeline uploaded successfully to {kfp_endpoint}")
+        except Exception as e:
+            print(f"Failed to upload the pipeline: {e}")
+    else:
+        print("KFP endpoint or token not provided. Skipping pipeline upload.")

@@ -3,9 +3,26 @@ from kfp import compiler
 from kfp.dsl import Output, Metrics, OutputPath
 from kfp import dsl
 
+BASE_IMAGE = "quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-20241218"
+
+ULTRALYTICS_PIP_VERSION="8.3.22"
+LOAD_DOTENV_PIP_VERSION="0.1.0"
+NUMPY_PIP_VERSION="1.26.4"
+MLFLOW_PIP_VERSION="2.17.1"
+ONNXRUNTIME_PIP_VERSION="1.19.2"
+ONNXSLIM_PIP_VERSION="0.1.36"
+
 @dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
-    packages_to_install=["ultralytics==8.3.22", "load_dotenv==0.1.0", "numpy==1.26.4", "mlflow==2.17.1", "onnxruntime==1.19.2", "onnxslim==0.1.36"]
+    # base_image="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111",
+    base_image=BASE_IMAGE,
+    packages_to_install=[
+        f"ultralytics=={ULTRALYTICS_PIP_VERSION}", 
+        f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}", 
+        f"numpy=={NUMPY_PIP_VERSION}", 
+        f"mlflow=={MLFLOW_PIP_VERSION}", 
+        f"onnxruntime=={ONNXRUNTIME_PIP_VERSION}", 
+        f"onnxslim=={ONNXSLIM_PIP_VERSION}"
+    ]
 )
 def train_yolo(
     model_name: str, 

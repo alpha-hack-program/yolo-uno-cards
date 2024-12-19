@@ -245,7 +245,7 @@ deploymentSpec:
         env:
         - name: EXPERIMENT_REPORTS_FOLDER_S3_KEY
           value: experiment-reports
-        image: image-registry.openshift-image-registry.svc:5000/default/train-yolo-optuna:latest
+        image: quay.io/atarazana/train_yolo_optuna:latest
 pipelineInfo:
   name: pipeline
 root:
