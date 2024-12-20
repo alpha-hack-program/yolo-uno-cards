@@ -82,9 +82,9 @@ def pipeline(
         pvc_name=datasets_pvc_name, size_in_gi=datasets_pvc_size_in_gi
     ).set_caching_options(False).set_display_name("dataset_storage")
 
-    # setup_shm_task = setup_storage_component(
-    #     pvc_name='shm-pvc', size_in_gi=2
-    # ).set_caching_options(False).set_display_name("shm_storage")
+    setup_shm_task = setup_storage_component(
+        pvc_name='shm-pvc', size_in_gi=2
+    ).set_caching_options(False).set_display_name("shm_storage")
 
     # Get the dataset
     force_dataset_path_clean = force_clean
@@ -120,25 +120,25 @@ def pipeline(
         models_root_folder=models_root_folder
     ).set_caching_options(False)
     train_model_task.after(get_images_dataset_task)
-    # train_model_task.after(setup_shm_task)
+    train_model_task.after(setup_shm_task)
     # TODO externalize these values
-    # train_model_task.set_memory_request("24Gi")
-    # train_model_task.set_cpu_request("8")
-    # train_model_task.set_memory_limit("24Gi")
-    # train_model_task.set_cpu_limit("8")
+    train_model_task.set_memory_request("24Gi")
+    train_model_task.set_cpu_request("8")
+    train_model_task.set_memory_limit("24Gi")
+    train_model_task.set_cpu_limit("8")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
-    # kubernetes.add_node_selector(
-    #     train_model_task,
-    #     label_key='nvidia.com/gpu.product',
-    #     label_value='NVIDIA-A10G'
-    # )
-    # kubernetes.add_toleration(
-    #     train_model_task,
-    #     key='nvidia.com/gpu',
-    #     operator='Exists',
-    #     effect='NoSchedule'
-    # )
+    kubernetes.add_node_selector(
+        train_model_task,
+        label_key='nvidia.com/gpu.product',
+        label_value='NVIDIA-A10G'
+    )
+    kubernetes.add_toleration(
+        train_model_task,
+        key='nvidia.com/gpu',
+        operator='Exists',
+        effect='NoSchedule'
+    )
 
     # Extract model name and metric value
     model_name = train_model_task.outputs["model_name_output"]
@@ -253,11 +253,11 @@ def pipeline(
     )
 
     # While the empty_dir_mount is not available, we can use ephemeral volume
-    # kubernetes.mount_pvc(
-    #     train_model_task,
-    #     pvc_name='shm-pvc',
-    #     mount_path='/dev/shm'
-    # )
+    kubernetes.mount_pvc(
+        train_model_task,
+        pvc_name='shm-pvc',
+        mount_path='/dev/shm'
+    )
 
     # This needs an upcoming version of the RHOAI pipelines
     # # Mount the PVC to the task 
