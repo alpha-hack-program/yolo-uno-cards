@@ -61,11 +61,15 @@ def upload_model(
         print(f"Uploading {model_path} to {models_s3_key}/{os.path.basename(model_path)}")
         bucket.upload_file(model_path, f"{models_s3_key}/{os.path.basename(model_path)}")
 
-if __name__ == "__main__":
+def main():
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
+    print(f"Compiling component to {component_package_path}")
     compiler.Compiler().compile(
         pipeline_func=upload_model,
         package_path=component_package_path
     )
+
+if __name__ == "__main__":
+    main()

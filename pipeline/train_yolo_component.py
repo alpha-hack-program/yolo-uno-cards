@@ -248,11 +248,15 @@ def train_yolo(
     if not training_mlrun:
         raise ValueError("MLflow run was not started")
 
-if __name__ == "__main__":
+def main():
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
+    print(f"Compiling component to {component_package_path}")
     compiler.Compiler().compile(
         pipeline_func=train_yolo,
         package_path=component_package_path
     )
+
+if __name__ == "__main__":
+    main()

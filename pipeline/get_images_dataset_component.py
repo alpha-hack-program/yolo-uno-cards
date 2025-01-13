@@ -109,11 +109,15 @@ def get_images_dataset(
         with open(images_dataset_yaml_path, 'w') as f:
             f.write(data)
 
-if __name__ == "__main__":
+def main():
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
+    print(f"Compiling component to {component_package_path}")
     compiler.Compiler().compile(
         pipeline_func=get_images_dataset,
         package_path=component_package_path
     )
+
+if __name__ == "__main__":
+    main()

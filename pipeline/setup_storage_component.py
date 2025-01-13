@@ -109,11 +109,15 @@ def setup_storage(
     except ApiException as e:
         raise RuntimeError(f"Failed to create PVC: {e.reason}")
 
-if __name__ == "__main__":
+def main():
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
+    print(f"Compiling component to {component_package_path}")
     compiler.Compiler().compile(
         pipeline_func=setup_storage,
         package_path=component_package_path
     )
+
+if __name__ == "__main__":
+    main()

@@ -17,10 +17,29 @@ from kfp.dsl import Input, Output, Metrics, OutputPath
 from kfp.components import load_component_from_file
 
 # Load the components from the files
+if not os.path.exists('setup_storage_component.yaml'):
+    from setup_storage_component import main as setup_storage_main
+    setup_storage_main()
 setup_storage_component = load_component_from_file('setup_storage_component.yaml')
+
+if not os.path.exists('get_images_dataset_component.yaml'):
+    from get_images_dataset_component import main as get_images_dataset_main
+    get_images_dataset_main()
 get_images_dataset_component = load_component_from_file('get_images_dataset_component.yaml')
+
+if not os.path.exists('train_yolo_component.yaml'):
+    from train_yolo_component import main as train_yolo_main
+    train_yolo_main()
 train_yolo_component = load_component_from_file('train_yolo_component.yaml')
+
+if not os.path.exists('upload_model_component.yaml'):
+    from upload_model_component import main as upload_model_main
+    upload_model_main()
 upload_model_component = load_component_from_file('upload_model_component.yaml')
+
+if not os.path.exists('upload_experiment_report_component.yaml'):
+    from upload_experiment_report_component import main as upload_experiment_report_main
+    upload_experiment_report_main()
 upload_experiment_report_component = load_component_from_file('upload_experiment_report_component.yaml')
 
 DATASETS_CONNECTION_SECRET = "aws-connection-datasets"

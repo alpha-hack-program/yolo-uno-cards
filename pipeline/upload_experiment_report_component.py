@@ -118,11 +118,15 @@ def upload_experiment_report(
     print(f"Uploading {experiment_report_file_path} to {experiment_report_s3_key}")
     bucket.upload_file(experiment_report_file_path, f"{experiment_report_s3_key}")
 
-if __name__ == "__main__":
+def main():
     # Generate and save the component YAML file
     component_package_path = __file__.replace('.py', '.yaml')
 
+    print(f"Compiling component to {component_package_path}")
     compiler.Compiler().compile(
         pipeline_func=upload_experiment_report,
         package_path=component_package_path
     )
+
+if __name__ == "__main__":
+    main()
