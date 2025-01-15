@@ -141,10 +141,10 @@ def pipeline(
     train_model_task.after(get_images_dataset_task)
     train_model_task.after(setup_shm_task)
     # TODO externalize these values
-    train_model_task.set_memory_request("24Gi")
-    train_model_task.set_cpu_request("8")
-    train_model_task.set_memory_limit("24Gi")
-    train_model_task.set_cpu_limit("8")
+    train_model_task.set_memory_request("16Gi")
+    train_model_task.set_cpu_request("4")
+    train_model_task.set_memory_limit("20Gi")
+    train_model_task.set_cpu_limit("6")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
     kubernetes.add_node_selector(
