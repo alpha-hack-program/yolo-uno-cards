@@ -1,6 +1,7 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
 import os
+from pyexpat import model
 import sys
 
 from typing import Dict
@@ -15,6 +16,10 @@ from kfp import dsl
 
 from kfp.dsl import Input, Output, Metrics, OutputPath
 from kfp.components import load_component_from_file
+
+# Load the register model from a url
+REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
+register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
 # Load the components from the files
 if not os.path.exists('setup_storage_component.yaml'):
@@ -116,6 +121,9 @@ def pipeline(
     ).set_caching_options(False)
     get_images_dataset_task.after(setup_storage_task)
 
+    # Extract the dataset S3 URI
+    dataset_s3_uri = get_images_dataset_task.outputs["dataset_s3_uri_output"]
+
     # Train the model
     train_model_task = train_yolo_component(
         model_name=model_name, 
@@ -170,6 +178,11 @@ def pipeline(
         model_name=model_name
     ).after(train_model_task).set_caching_options(False)
 
+    # Extract the models S3 URI
+    models_s3_uri = upload_model_task.outputs["models_s3_uri_output"]
+    model_onnx_s3_uri = upload_model_task.outputs["model_onnx_s3_uri_output"]
+    model_pt_s3_uri = upload_model_task.outputs["model_pt_s3_uri_output"]
+
     # Upload the experiment report
     upload_experiment_report_component_task = upload_experiment_report_component(
         experiment_name=experiment_name,
@@ -186,6 +199,44 @@ def pipeline(
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
         label_smoothing=label_smoothing,
+    ).after(train_model_task).set_caching_options(False)
+
+    model_registry_name = "model-registry-dev"
+    istio_system_namespace = "istio-system"
+    model_name = experiment_name
+    model_uri = models_s3_uri
+    model_version = run_name
+    model_description = "Model to detect uno cards"
+    model_format_name = "onnx"
+    model_format_version = "1"
+    author = "author"
+    owner = "owner"
+
+    labels = {
+        "vision": "",
+        "yolo": "",
+        "uno-cards": "",
+        "dataset": images_dataset_name,
+        "dataset_uri": dataset_s3_uri,
+        "experiment": experiment_name,
+        "run": run_name,
+        "metric_value": metric_value,
+    }
+
+    # Register model
+    register_model_task = register_model_component(
+        model_registry_name=model_registry_name,
+        istio_system_namespace=istio_system_namespace,
+        model_name=model_name,
+        model_uri=model_uri,
+        model_version=model_version,
+        model_description=model_description,
+        model_format_name=model_format_name,
+        model_format_version=model_format_version,
+        author=author,
+        owner=owner,
+        labels=labels,
+        input_metrics=train_model_task.outputs["results_output_metrics"],
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 

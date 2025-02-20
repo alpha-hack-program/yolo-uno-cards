@@ -1,6 +1,6 @@
 from kfp import compiler
 
-from kfp.dsl import component
+from kfp.dsl import component, OutputPath
 
 BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
 BOTOCORE_PIP_VERSION= "1.35.54"
@@ -25,7 +25,8 @@ def get_images_dataset(
     images_dataset_name: str,
     images_dataset_yaml: str,
     root_mount_path: str,
-    force_clean: bool
+    force_clean: bool,
+    dataset_s3_uri_output: OutputPath(str)
 ):
     import boto3
     import botocore
@@ -108,6 +109,11 @@ def get_images_dataset(
         print(f"Updated YAML file: {data}")
         with open(images_dataset_yaml_path, 'w') as f:
             f.write(data)
+
+    # Build the dataset S3 URI using the S3 endpoint, bucket name, and dataset S3 key
+    dataset_s3_uri = f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}"
+    with open(dataset_s3_uri_output, 'w') as f:
+        f.write(dataset_s3_uri)
 
 def main():
     # Generate and save the component YAML file

@@ -55,7 +55,7 @@ def upload_experiment_report(
     #     raise ValueError(f"Failed to load metric value: {e}")
 
     # Experiment report s3 key to store the report
-    experiment_report_file_name = f"{experiment_name}.yaml"
+    experiment_report_file_name = f"{run_name}.yaml"
     experiment_report_s3_key = f"{experiment_reports_folder}/{experiment_report_file_name}"
     print(f"experiment_report_s3_key = {experiment_report_s3_key}")
 

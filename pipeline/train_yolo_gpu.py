@@ -16,6 +16,10 @@ from kfp import dsl
 from kfp.dsl import Input, Output, Metrics, OutputPath
 from kfp.components import load_component_from_file
 
+# Load the register model from a url
+REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
+register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
+
 # Load the components from the files
 if not os.path.exists('setup_storage_component.yaml'):
     from setup_storage_component import main as setup_storage_main
@@ -186,6 +190,43 @@ def pipeline(
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
         label_smoothing=label_smoothing,
+    ).after(train_model_task).set_caching_options(False)
+
+    model_registry_name = "model-registry-dev"
+    istio_system_namespace = "istio-system"
+    model_name = f"{experiment_name}"
+    model_uri = "oci://model_uri"
+    model_version = f"{run_name}"
+    model_description = "Model to detect uno cards"
+    model_format_name = "onnx"
+    model_format_version = "1"
+    author = "author"
+    owner = "owner"
+
+    labels = {
+        "vision": "",
+        "yolo": "",
+        "uno-cards": "",
+        "dataset": images_dataset_name,
+        "experiment": experiment_name,
+        "run": run_name,
+        "metric_value": metric_value,
+    }
+
+    # Register model
+    register_model_task = register_model_component(
+        model_registry_name=model_registry_name,
+        istio_system_namespace=istio_system_namespace,
+        model_name=model_name,
+        model_uri=model_uri,
+        model_version=model_version,
+        model_description=model_description,
+        model_format_name=model_format_name,
+        model_format_version=model_format_version,
+        author=author,
+        owner=owner,
+        labels=labels,
+        input_metrics=train_model_task.outputs["results_output_metrics"],
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 
