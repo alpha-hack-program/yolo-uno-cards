@@ -50,6 +50,17 @@ spec:
           value: "{{ .Values.pipelines.connection.awsS3Bucket }}"
         - name: pipelines.connection.awsS3Endpoint
           value: "{{ .Values.pipelines.connection.awsS3Endpoint }}"
+
+        - name: s3.connection.awsAccessKeyId
+          value: "{{ .Values.s3.connection.awsAccessKeyId }}"
+        - name: s3.connection.awsSecretAccessKey
+          value: "{{ .Values.s3.connection.awsSecretAccessKey }}"
+        - name: s3.config.awsS3BucketList
+          value: "{{ .Values.s3.config.awsS3BucketList }}"
+        - name: s3.connection.awsS3Endpoint
+          value: "{{ .Values.s3.connection.awsS3Endpoint }}"
+        - name: images.python3
+          value: "{{ .Values.images.python3 }}"
   syncPolicy:
     automated:
       # prune: true

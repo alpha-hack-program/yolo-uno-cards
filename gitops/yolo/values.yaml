@@ -76,3 +76,17 @@ mlflow-server:
     s3EndpointUrl: http://minio.ic-shared-minio.svc:9000
     s3AccessKeyId: minio
     s3SecretAccessKey: minio123
+
+# s3 auto config
+s3:
+  project:
+    namespace: minio
+  connection:
+    awsAccessKeyId: minio
+    awsSecretAccessKey: minio123
+    awsS3Endpoint: http://minio.minio.svc:9000
+  config:
+    awsS3BucketList: pipelines,datasets,models
+
+images:
+  python3: registry.redhat.io/ubi9/python-312

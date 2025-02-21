@@ -142,6 +142,15 @@ spec:
           value: "${S3_SCHEME}"
         - name: models.connection.awsS3Endpoint
           value: "${S3_ENDPOINT}"
+        
+        - name: s3.connection.awsAccessKeyId
+          value: "${S3_ACCESS_KEY}"
+        - name: s3.connection.awsSecretAccessKey
+          value: "${S3_SECRET_KEY}"
+        - name: s3.config.awsS3BucketList
+          value: "${S3_BUCKETS}"
+        - name: s3.connection.awsS3Endpoint
+          value: "${S3_SCHEME}://${S3_ENDPOINT}"
   syncPolicy:
     automated:
       selfHeal: true      
