@@ -90,7 +90,7 @@ def objective(trial: optuna.Trial,
     print(f"Run name: {run_name}")
     
     # Add experiment_name, here is the experiment name is the run_name 
-    params["experiment_name"] = run_name
+    params["experiment_name"] = experiment_name
     params["run_name"] = run_name
 
     # Add parmaters to set the dataset to use, etc.
