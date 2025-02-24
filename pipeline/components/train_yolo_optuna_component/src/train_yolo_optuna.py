@@ -3,6 +3,7 @@
 import os
 
 from kfp import dsl
+from kfp.dsl import Output, Metrics
 
 import os
 import re
@@ -166,12 +167,13 @@ def train_model_optuna(
     search_space: str,
     experiment_name_prefix: str,
     pipeline_name: str,
-    images_dataset_name: str = "uno-cards-v1.2",
-    images_datasets_root_folder: str = "datasets",
-    images_dataset_yaml: str = "data.yaml",
-    models_root_folder: str = "models",
-    images_dataset_pvc_name: str = "images-datasets-pvc",
-    images_dataset_pvc_size_in_gi: int = 5,
+    images_dataset_name: str,
+    images_datasets_root_folder: str,
+    images_dataset_yaml: str,
+    models_root_folder: str,
+    images_dataset_pvc_name: str,
+    images_dataset_pvc_size_in_gi: int,
+    results_output_metrics: Output[Metrics]
 ):
     experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
 
@@ -233,3 +235,9 @@ def train_model_optuna(
     print(study.best_value)
     print("\nStudy trials:")
     print(study.trials)
+
+    # Log the best value
+    results_output_metrics.log_metric("best_value", study.best_value)
+
+    # Log the best hyperparameters
+    results_output_metrics.log_metric("best_hyperparameters", study.best_params)

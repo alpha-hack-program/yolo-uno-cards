@@ -1,7 +1,6 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
 import os
-from pyexpat import model
 import sys
 
 from typing import Dict
@@ -93,6 +92,8 @@ def pipeline(
     models_root_folder: str = "models",
     images_dataset_pvc_name: str = "images-datasets-pvc",
     images_dataset_pvc_size_in_gi: int = 5,
+    author: str = "John Doe",
+    owner: str = "acme",
     force_clean: bool = False):
 
     # Define the root mount path
@@ -106,9 +107,9 @@ def pipeline(
         pvc_name=datasets_pvc_name, size_in_gi=datasets_pvc_size_in_gi
     ).set_caching_options(False).set_display_name("dataset_storage")
 
-    # setup_shm_task = setup_storage_component(
-    #     pvc_name='shm-pvc', size_in_gi=2
-    # ).set_caching_options(False).set_display_name("shm_storage")
+    setup_shm_task = setup_storage_component(
+        pvc_name='shm-pvc', size_in_gi=2
+    ).set_caching_options(False).set_display_name("shm_storage")
 
     # Get the dataset
     force_dataset_path_clean = force_clean
@@ -147,7 +148,7 @@ def pipeline(
         models_root_folder=models_root_folder
     ).set_caching_options(False)
     train_model_task.after(get_images_dataset_task)
-    # train_model_task.after(setup_shm_task)
+    train_model_task.after(setup_shm_task)
     # TODO externalize these values
     # train_model_task.set_memory_request("24Gi")
     # train_model_task.set_cpu_request("8")

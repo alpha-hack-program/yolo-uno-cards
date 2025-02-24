@@ -10,6 +10,7 @@ import kfp
 
 from kfp import compiler
 from kfp import dsl
+from kfp.dsl import Output, Metrics
 
 from kfp import kubernetes
 
@@ -21,6 +22,10 @@ BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
 KFP_PIP_VERSION="2.8.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
+
+# Load the train_yolo_optuna component from a url
+TRAIN_YOLO_OPTUNA_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/yolo-uno-cards/refs/heads/main/pipeline/components/train_yolo_optuna_component/src/component_metadata/train_model_optuna.yaml"
+train_yolo_optuna_component = kfp.components.load_component_from_url(TRAIN_YOLO_OPTUNA_COMPONENT_URL)
 
 # This component checks the kfp env
 @dsl.component(
@@ -164,12 +169,13 @@ def train_model_optuna(
     search_space: str,
     experiment_name_prefix: str,
     pipeline_name: str,
-    images_dataset_name: str = "uno-cards-v1.2",
-    images_datasets_root_folder: str = "datasets",
-    images_dataset_yaml: str = "data.yaml",
-    models_root_folder: str = "models",
-    images_dataset_pvc_name: str = "images-datasets-pvc",
-    images_dataset_pvc_size_in_gi: int = 5,
+    images_dataset_name: str,
+    images_datasets_root_folder: str,
+    images_dataset_yaml: str,
+    models_root_folder: str,
+    images_dataset_pvc_name: str,
+    images_dataset_pvc_size_in_gi: int,
+    results_output_metrics: Output[Metrics]
 ):
     import os
     import yaml
@@ -476,6 +482,12 @@ def train_model_optuna(
     print(study.best_value)
     print("\nStudy trials:")
     print(study.trials)
+
+    # Log the best value
+    results_output_metrics.log_metric("best_value", study.best_value)
+
+    # Log the best hyperparameters
+    results_output_metrics.log_metric("best_hyperparameters", study.best_params)
 
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
 # upload the model to another S3 bucket.

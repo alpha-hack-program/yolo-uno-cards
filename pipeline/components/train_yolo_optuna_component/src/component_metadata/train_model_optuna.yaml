@@ -2,16 +2,19 @@
 # Name: train-model-optuna
 # Inputs:
 #    experiment_name_prefix: str
-#    images_dataset_name: str [Default: 'uno-cards-v1.2']
-#    images_dataset_pvc_name: str [Default: 'images-datasets-pvc']
-#    images_dataset_pvc_size_in_gi: int [Default: 5.0]
-#    images_dataset_yaml: str [Default: 'data.yaml']
-#    images_datasets_root_folder: str [Default: 'datasets']
+#    images_dataset_name: str
+#    images_dataset_pvc_name: str
+#    images_dataset_pvc_size_in_gi: int
+#    images_dataset_yaml: str
+#    images_datasets_root_folder: str
 #    model_name: str
-#    models_root_folder: str [Default: 'models']
+#    models_root_folder: str
 #    n_trials: int
 #    pipeline_name: str
 #    search_space: str
+# Outputs:
+#    results_output_metrics: system.Metrics
+#    train-model-optuna-results_output_metrics: system.Metrics
 components:
   comp-train-model-optuna:
     executorLabel: exec-train-model-optuna
@@ -20,30 +23,18 @@ components:
         experiment_name_prefix:
           parameterType: STRING
         images_dataset_name:
-          defaultValue: uno-cards-v1.2
-          isOptional: true
           parameterType: STRING
         images_dataset_pvc_name:
-          defaultValue: images-datasets-pvc
-          isOptional: true
           parameterType: STRING
         images_dataset_pvc_size_in_gi:
-          defaultValue: 5.0
-          isOptional: true
           parameterType: NUMBER_INTEGER
         images_dataset_yaml:
-          defaultValue: data.yaml
-          isOptional: true
           parameterType: STRING
         images_datasets_root_folder:
-          defaultValue: datasets
-          isOptional: true
           parameterType: STRING
         model_name:
           parameterType: STRING
         models_root_folder:
-          defaultValue: models
-          isOptional: true
           parameterType: STRING
         n_trials:
           parameterType: NUMBER_INTEGER
@@ -51,6 +42,12 @@ components:
           parameterType: STRING
         search_space:
           parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        results_output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
 deploymentSpec:
   executors:
     exec-train-model-optuna:
@@ -76,6 +73,16 @@ pipelineInfo:
   name: train-model-optuna
 root:
   dag:
+    outputs:
+      artifacts:
+        results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-model-optuna
+        train-model-optuna-results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-model-optuna
     tasks:
       train-model-optuna:
         cachingOptions:
@@ -113,30 +120,18 @@ root:
       experiment_name_prefix:
         parameterType: STRING
       images_dataset_name:
-        defaultValue: uno-cards-v1.2
-        isOptional: true
         parameterType: STRING
       images_dataset_pvc_name:
-        defaultValue: images-datasets-pvc
-        isOptional: true
         parameterType: STRING
       images_dataset_pvc_size_in_gi:
-        defaultValue: 5.0
-        isOptional: true
         parameterType: NUMBER_INTEGER
       images_dataset_yaml:
-        defaultValue: data.yaml
-        isOptional: true
         parameterType: STRING
       images_datasets_root_folder:
-        defaultValue: datasets
-        isOptional: true
         parameterType: STRING
       model_name:
         parameterType: STRING
       models_root_folder:
-        defaultValue: models
-        isOptional: true
         parameterType: STRING
       n_trials:
         parameterType: NUMBER_INTEGER
@@ -144,5 +139,15 @@ root:
         parameterType: STRING
       search_space:
         parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
+      train-model-optuna-results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.8.0

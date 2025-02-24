@@ -92,6 +92,8 @@ def pipeline(
     models_root_folder: str = "models",
     images_dataset_pvc_name: str = "images-datasets-pvc",
     images_dataset_pvc_size_in_gi: int = 5,
+    author: str = "John Doe",
+    owner: str = "acme",
     force_clean: bool = False):
 
     # Define the root mount path
@@ -119,6 +121,9 @@ def pipeline(
         force_clean=force_dataset_path_clean
     ).set_caching_options(False)
     get_images_dataset_task.after(setup_storage_task)
+
+    # Extract the dataset S3 URI
+    dataset_s3_uri = get_images_dataset_task.outputs["dataset_s3_uri_output"]
 
     # Train the model
     train_model_task = train_yolo_component(
@@ -174,6 +179,11 @@ def pipeline(
         model_name=model_name
     ).after(train_model_task).set_caching_options(False)
 
+    # Extract the models S3 URI
+    models_s3_uri = upload_model_task.outputs["models_s3_uri_output"]
+    model_onnx_s3_uri = upload_model_task.outputs["model_onnx_s3_uri_output"]
+    model_pt_s3_uri = upload_model_task.outputs["model_pt_s3_uri_output"]
+
     # Upload the experiment report
     upload_experiment_report_component_task = upload_experiment_report_component(
         experiment_name=experiment_name,
@@ -194,9 +204,9 @@ def pipeline(
 
     model_registry_name = "model-registry-dev"
     istio_system_namespace = "istio-system"
-    model_name = f"{experiment_name}"
-    model_uri = "oci://model_uri"
-    model_version = f"{run_name}"
+    model_name = experiment_name
+    model_uri = models_s3_uri
+    model_version = run_name
     model_description = "Model to detect uno cards"
     model_format_name = "onnx"
     model_format_version = "1"
@@ -208,6 +218,7 @@ def pipeline(
         "yolo": "",
         "uno-cards": "",
         "dataset": images_dataset_name,
+        "dataset_uri": dataset_s3_uri,
         "experiment": experiment_name,
         "run": run_name,
         "metric_value": metric_value,
@@ -421,7 +432,7 @@ if __name__ == '__main__':
 
     # If both kfp_endpoint and token are provided, upload the pipeline
     if kfp_endpoint and token:
-        client = kfp.Client(host=kfp_endpoint, existing_token=token)
+        client = kfp.Client(host=kfp_endpoint, existing_token=token, verify_ssl=False)
 
         # If endpoint doesn't have a protocol (http or https), add https
         if not kfp_endpoint.startswith("http"):
