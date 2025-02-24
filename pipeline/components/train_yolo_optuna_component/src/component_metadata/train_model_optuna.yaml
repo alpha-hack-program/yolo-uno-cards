@@ -1,15 +1,20 @@
 # PIPELINE DEFINITION
 # Name: train-model-optuna
 # Inputs:
+#    author: str
 #    experiment_name_prefix: str
 #    images_dataset_name: str
 #    images_dataset_pvc_name: str
 #    images_dataset_pvc_size_in_gi: int
 #    images_dataset_yaml: str
 #    images_datasets_root_folder: str
+#    istio_system_namespace: str
 #    model_name: str
+#    model_registry_name: str
+#    model_tags: str
 #    models_root_folder: str
 #    n_trials: int
+#    owner: str
 #    pipeline_name: str
 #    search_space: str
 # Outputs:
@@ -20,6 +25,8 @@ components:
     executorLabel: exec-train-model-optuna
     inputDefinitions:
       parameters:
+        author:
+          parameterType: STRING
         experiment_name_prefix:
           parameterType: STRING
         images_dataset_name:
@@ -32,12 +39,20 @@ components:
           parameterType: STRING
         images_datasets_root_folder:
           parameterType: STRING
+        istio_system_namespace:
+          parameterType: STRING
         model_name:
+          parameterType: STRING
+        model_registry_name:
+          parameterType: STRING
+        model_tags:
           parameterType: STRING
         models_root_folder:
           parameterType: STRING
         n_trials:
           parameterType: NUMBER_INTEGER
+        owner:
+          parameterType: STRING
         pipeline_name:
           parameterType: STRING
         search_space:
@@ -91,6 +106,8 @@ root:
           name: comp-train-model-optuna
         inputs:
           parameters:
+            author:
+              componentInputParameter: author
             experiment_name_prefix:
               componentInputParameter: experiment_name_prefix
             images_dataset_name:
@@ -103,12 +120,20 @@ root:
               componentInputParameter: images_dataset_yaml
             images_datasets_root_folder:
               componentInputParameter: images_datasets_root_folder
+            istio_system_namespace:
+              componentInputParameter: istio_system_namespace
             model_name:
               componentInputParameter: model_name
+            model_registry_name:
+              componentInputParameter: model_registry_name
+            model_tags:
+              componentInputParameter: model_tags
             models_root_folder:
               componentInputParameter: models_root_folder
             n_trials:
               componentInputParameter: n_trials
+            owner:
+              componentInputParameter: owner
             pipeline_name:
               componentInputParameter: pipeline_name
             search_space:
@@ -117,6 +142,8 @@ root:
           name: train-model-optuna
   inputDefinitions:
     parameters:
+      author:
+        parameterType: STRING
       experiment_name_prefix:
         parameterType: STRING
       images_dataset_name:
@@ -129,12 +156,20 @@ root:
         parameterType: STRING
       images_datasets_root_folder:
         parameterType: STRING
+      istio_system_namespace:
+        parameterType: STRING
       model_name:
+        parameterType: STRING
+      model_registry_name:
+        parameterType: STRING
+      model_tags:
         parameterType: STRING
       models_root_folder:
         parameterType: STRING
       n_trials:
         parameterType: NUMBER_INTEGER
+      owner:
+        parameterType: STRING
       pipeline_name:
         parameterType: STRING
       search_space:

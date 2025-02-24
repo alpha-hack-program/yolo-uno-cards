@@ -46,6 +46,11 @@ def objective(trial: optuna.Trial,
               models_root_folder: str,
               images_dataset_pvc_name: str,
               images_dataset_pvc_size_in_gi: int,
+              author: str,
+              owner: str,
+              model_tags: str,
+              model_registry_name: str,
+              istio_system_namespace: str,
               token: str, 
               kfp_endpoint: str):
     # Dynamically define hyperparameter search space
@@ -95,6 +100,11 @@ def objective(trial: optuna.Trial,
     params["models_root_folder"] = models_root_folder
     params["images_dataset_pvc_name"] = images_dataset_pvc_name
     params["images_dataset_pvc_size_in_gi"] = images_dataset_pvc_size_in_gi
+    params["author"] = author
+    params["owner"] = owner
+    params["model_tags"] = model_tags
+    params["model_registry_name"] = model_registry_name
+    params["istio_system_namespace"] = istio_system_namespace
     params["model_name"] = model_name
 
     print(f"params: {params}")
@@ -177,6 +187,11 @@ def train_model_optuna(
     models_root_folder: str,
     images_dataset_pvc_name: str,
     images_dataset_pvc_size_in_gi: int,
+    author: str,
+    owner: str,
+    model_tags: str,
+    model_registry_name: str,
+    istio_system_namespace: str,
     results_output_metrics: Output[Metrics]
 ):
     experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
@@ -225,6 +240,11 @@ def train_model_optuna(
                                            models_root_folder=models_root_folder,
                                            images_dataset_pvc_name=images_dataset_pvc_name,
                                            images_dataset_pvc_size_in_gi=images_dataset_pvc_size_in_gi,
+                                           author=author,
+                                           owner=owner,
+                                           model_registry_name=model_registry_name,
+                                           istio_system_namespace=istio_system_namespace,
+                                           model_tags=model_tags,
                                            token=token, 
                                            kfp_endpoint=kfp_endpoint), n_trials=n_trials)
 
