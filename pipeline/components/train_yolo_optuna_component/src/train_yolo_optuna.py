@@ -127,6 +127,9 @@ def objective(trial: optuna.Trial,
             print(f"run_details {run_details}")
 
             # Get metrics from run_details is not working...
+            if run_details.state == "FAILED":
+                print(f"Run {run_name} failed.")
+                raise ValueError(f"Run {run_name} failed.")
 
             # Load the experiment report from S3 we use the run_name as the experiment name
             experiment_report = download_experiment_report(run_name)

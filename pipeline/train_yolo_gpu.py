@@ -68,6 +68,38 @@ def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)
     with open(map75_output, 'w') as f:
         f.write(str(map75))
 
+# Helper component for JSON serialization
+@dsl.component(
+    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301"
+)
+def create_serialized_labels(
+    images_dataset_name: str,
+    dataset_s3_uri: str,
+    experiment_name: str,
+    run_name: str,
+    metric_value: float,
+    tags: str
+) -> str:
+    import json
+
+    # Create a dictionary with the labels
+    labels_dict = {
+        "dataset": images_dataset_name,
+        "dataset_uri": dataset_s3_uri,
+        "experiment": experiment_name,
+        "run": run_name,
+        "metric_value": metric_value,
+    }
+    # If tags are provided, add them to the labels_dict
+    if tags:
+        # Split the tags by comma and remove any leading or trailing spaces
+        # Then create a key with the tag with empty value and add it to the labels_dict
+        for tag in tags.split(","):
+            tag = tag.strip()
+            labels_dict[tag] = ""
+
+    return json.dumps(labels_dict)
+
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
@@ -94,6 +126,9 @@ def pipeline(
     images_dataset_pvc_size_in_gi: int = 5,
     author: str = "John Doe",
     owner: str = "acme",
+    model_tags: str = "vision, yolo, uno-cards",
+    model_registry_name: str = "model-registry-dev",
+    istio_system_namespace: str = "istio-system",
     force_clean: bool = False):
 
     # Define the root mount path
@@ -202,27 +237,26 @@ def pipeline(
         label_smoothing=label_smoothing,
     ).after(train_model_task).set_caching_options(False)
 
-    model_registry_name = "model-registry-dev"
-    istio_system_namespace = "istio-system"
+    # Create labels through helper component
+    create_labels_task = create_serialized_labels(
+        images_dataset_name=images_dataset_name,
+        dataset_s3_uri=dataset_s3_uri,
+        experiment_name=experiment_name,
+        run_name=run_name,
+        metric_value=metric_value,
+        tags=model_tags
+    ).after(train_model_task)
+
+    model_registry_name = model_registry_name
+    istio_system_namespace = istio_system_namespace
     model_name = experiment_name
     model_uri = models_s3_uri
     model_version = run_name
     model_description = "Model to detect uno cards"
     model_format_name = "onnx"
     model_format_version = "1"
-    author = "author"
-    owner = "owner"
-
-    labels = {
-        "vision": "",
-        "yolo": "",
-        "uno-cards": "",
-        "dataset": images_dataset_name,
-        "dataset_uri": dataset_s3_uri,
-        "experiment": experiment_name,
-        "run": run_name,
-        "metric_value": metric_value,
-    }
+    author = author
+    owner = owner
 
     # Register model
     register_model_task = register_model_component(
@@ -236,7 +270,7 @@ def pipeline(
         model_format_version=model_format_version,
         author=author,
         owner=owner,
-        labels=labels,
+        labels=create_labels_task.outputs["Output"],
         input_metrics=train_model_task.outputs["results_output_metrics"],
     ).after(train_model_task).set_caching_options(False)
 
