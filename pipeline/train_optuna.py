@@ -181,6 +181,7 @@ def train_model_optuna(
     import yaml
     import re
     import time
+    import json
 
     import optuna
 
@@ -486,8 +487,9 @@ def train_model_optuna(
     # Log the best value
     results_output_metrics.log_metric("best_value", study.best_value)
 
-    # Log the best hyperparameters
-    results_output_metrics.log_metric("best_hyperparameters", study.best_params)
+    # Log the best hyperparameters as a JSON string
+    best_params_json = json.dumps(study.best_params)
+    results_output_metrics.log_metric("best_hyperparameters", best_params_json)
 
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
 # upload the model to another S3 bucket.
@@ -550,8 +552,8 @@ def pipeline(
         batch_size_bounds=batch_size_bounds,
     ).set_caching_options(False)
 
-    # Train the model
-    train_model_task = train_model_optuna(
+    # Train the model (local train_model_optuna) or remote component train_yolo_optuna_component
+    train_model_task = train_yolo_optuna_component(
         model_name=model_name,
         n_trials=n_trials,
         search_space=generate_search_space_task.outputs["Output"],

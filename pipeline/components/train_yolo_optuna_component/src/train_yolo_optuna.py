@@ -1,5 +1,6 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
+import json
 import os
 
 from kfp import dsl
@@ -239,5 +240,6 @@ def train_model_optuna(
     # Log the best value
     results_output_metrics.log_metric("best_value", study.best_value)
 
-    # Log the best hyperparameters
-    results_output_metrics.log_metric("best_hyperparameters", study.best_params)
+    # Log the best hyperparameters as a JSON string
+    best_params_json = json.dumps(study.best_params)
+    results_output_metrics.log_metric("best_hyperparameters", best_params_json)
