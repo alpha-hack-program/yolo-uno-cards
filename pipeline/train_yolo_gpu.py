@@ -68,7 +68,7 @@ def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)
     with open(map75_output, 'w') as f:
         f.write(str(map75))
 
-# Helper component for JSON serialization
+# Helper component for JSON serialization of labels
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301"
 )
@@ -78,6 +78,16 @@ def create_serialized_labels(
     experiment_name: str,
     run_name: str,
     metric_value: float,
+    image_size: int, 
+    epochs: int, 
+    batch_size: int,
+    optimizer: str,
+    learning_rate: float,
+    momentum: float,
+    weight_decay: float,
+    confidence_threshold: float,
+    iou_threshold: float,
+    label_smoothing: float,
     tags: str
 ) -> str:
     import json
@@ -89,6 +99,16 @@ def create_serialized_labels(
         "experiment": experiment_name,
         "run": run_name,
         "metric_value": metric_value,
+        "image_size": image_size,
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "optimizer": optimizer,
+        "learning_rate": learning_rate,
+        "momentum": momentum,
+        "weight_decay": weight_decay,
+        "confidence_threshold": confidence_threshold,
+        "iou_threshold": iou_threshold,
+        "label_smoothing": label_smoothing
     }
     # If tags are provided, add them to the labels_dict
     if tags:
@@ -244,6 +264,16 @@ def pipeline(
         experiment_name=experiment_name,
         run_name=run_name,
         metric_value=metric_value,
+        image_size=image_size, 
+        epochs=epochs,
+        batch_size=batch_size,
+        optimizer=optimizer,
+        learning_rate=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        confidence_threshold=confidence_threshold,
+        iou_threshold=iou_threshold,
+        label_smoothing=label_smoothing,
         tags=model_tags
     ).after(train_model_task)
 
