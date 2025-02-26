@@ -12,6 +12,18 @@ argocdNamespace: openshift-gitops
 dataScienceProjectNamespace: yolo
 dataScienceProjectDisplayName: yolo
 
+modelRegistries:
+  - name: model-registry-dev
+    databaseName: metadb
+    databaseUser: root
+    databasePassword: test
+  - name: model-registry-pro
+    databaseName: metadb
+    databaseUser: root
+    databasePassword: test
+
+istioSystemNamespace: istio-system
+
 instanceName: yolo
 
 createNamespace: true
