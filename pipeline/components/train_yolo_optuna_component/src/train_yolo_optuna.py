@@ -3,6 +3,7 @@
 import json
 import os
 
+from cv2 import exp
 from kfp import dsl
 from kfp.dsl import Output, Metrics
 
@@ -36,6 +37,7 @@ LOAD_DOTENV_PIP_VERSION="0.1.0"
 
 # Define the objective function
 def objective(trial: optuna.Trial, 
+              trial_names: dict,
               search_space: dict, 
               experiment_name: str,
               pipeline_name: str,
@@ -146,6 +148,9 @@ def objective(trial: optuna.Trial,
             # Access the values
             metric_value = experiment_report['report']['metric_value']
             print(f"metric_value: {metric_value}")
+
+            # Store the trial name
+            trial_names[trial.number] = experiment_name, run_name
         else:
             print(f"Pipeline {pipeline_name} does not exist.") 
             raise ValueError(f"Pipeline {pipeline_name} does not exist.")
@@ -192,6 +197,8 @@ def train_model_optuna(
     model_tags: str,
     model_registry_name: str,
     istio_system_namespace: str,
+    output_model_name: Output[str],
+    output_best_model_version: Output[str],
     results_output_metrics: Output[Metrics]
 ):
     experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
@@ -228,8 +235,12 @@ def train_model_optuna(
     # Load search space from str
     search_space = load_yaml(search_space)
 
+    # Dict to store (experiment_name, run_name, metric_value) by trial number
+    trial_names = {}
+
     # Run the optimization callback a func
     study.optimize(lambda trial: objective(trial=trial,
+                                           trial_names=trial_names,
                                            search_space=search_space, 
                                            experiment_name=experiment_name, 
                                            pipeline_name=pipeline_name,
@@ -266,3 +277,16 @@ def train_model_optuna(
     # Log the best hyperparameters as a JSON string
     best_params_json = json.dumps(study.best_params)
     results_output_metrics.log_metric("best_hyperparameters", best_params_json)
+
+    # Get the best tuple (experiment_name, run_name)
+    model_name, model_version  = trial_names[study.best_trial.number]
+
+    # Write the best model name and version to the output
+    with open(output_model_name, 'w') as f:
+        f.write(str(model_name))
+
+    # Write the best model version to the output
+    with open(output_best_model_version, 'w') as f:
+        f.write(str(model_version))
+
+    

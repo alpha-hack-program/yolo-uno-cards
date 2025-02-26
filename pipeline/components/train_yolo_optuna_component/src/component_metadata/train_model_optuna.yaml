@@ -18,6 +18,8 @@
 #    pipeline_name: str
 #    search_space: str
 # Outputs:
+#    output_best_model_version: str
+#    output_model_name: str
 #    results_output_metrics: system.Metrics
 #    train-model-optuna-results_output_metrics: system.Metrics
 components:
@@ -63,6 +65,11 @@ components:
           artifactType:
             schemaTitle: system.Metrics
             schemaVersion: 0.0.1
+      parameters:
+        output_best_model_version:
+          parameterType: STRING
+        output_model_name:
+          parameterType: STRING
 deploymentSpec:
   executors:
     exec-train-model-optuna:
@@ -97,6 +104,15 @@ root:
         train-model-optuna-results_output_metrics:
           artifactSelectors:
           - outputArtifactKey: results_output_metrics
+            producerSubtask: train-model-optuna
+      parameters:
+        output_best_model_version:
+          valueFromParameter:
+            outputParameterKey: output_best_model_version
+            producerSubtask: train-model-optuna
+        output_model_name:
+          valueFromParameter:
+            outputParameterKey: output_model_name
             producerSubtask: train-model-optuna
     tasks:
       train-model-optuna:
@@ -184,5 +200,10 @@ root:
         artifactType:
           schemaTitle: system.Metrics
           schemaVersion: 0.0.1
+    parameters:
+      output_best_model_version:
+        parameterType: STRING
+      output_model_name:
+        parameterType: STRING
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.8.0
