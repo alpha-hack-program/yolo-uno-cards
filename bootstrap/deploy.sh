@@ -82,10 +82,12 @@ spec:
           value: "${TARGET_REVISION}"
         - name: instanceName
           value: "${INSTANCE_NAME}"
+          
         - name: dataScienceProjectNamespace
           value: "${DATA_SCIENCE_PROJECT_NAMESPACE}"
         - name: dataScienceProjectDisplayName
           value: "${DATA_SCIENCE_PROJECT_NAMESPACE}"
+
         - name: pipelines.connection.name
           value: "pipelines"
         - name: pipelines.connection.displayName
@@ -119,7 +121,7 @@ spec:
           value: "none"
         - name: datasets.connection.awsS3Bucket
           value: "${DATASETS_BUCKET_NAME}"
-        - name: pipelines.connection.scheme
+        - name: datasets.connection.scheme
           value: "${S3_SCHEME}"
         - name: datasets.connection.awsS3Endpoint
           value: "${S3_ENDPOINT}"
@@ -138,7 +140,7 @@ spec:
           value: "none"
         - name: models.connection.awsS3Bucket
           value: "${MODELS_BUCKET_NAME}"
-        - name: pipelines.connection.scheme
+        - name: models.connection.scheme
           value: "${S3_SCHEME}"
         - name: models.connection.awsS3Endpoint
           value: "${S3_ENDPOINT}"
