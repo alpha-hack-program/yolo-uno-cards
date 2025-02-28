@@ -17,6 +17,12 @@ COMPONENT_NAME=$1
 # Source the component-specific environment variables if the file exists
 [ -f ${COMPONENT_NAME}/.env ] && . ${COMPONENT_NAME}/.env
 
+# Print info
+echo "COMPONENT_NAME: ${COMPONENT_NAME}"
+echo "BASE_IMAGE: ${BASE_IMAGE}"
+echo "REGISTRY: ${REGISTRY}"
+echo "TAG: ${TAG}"
+
 # Run the component image
-podman run -it --rm localhost/${COMPONENT_NAME}:latest bash
+podman run -it --rm localhost/${COMPONENT_NAME}:${TAG} bash
 # podman run -it --rm --entrypoint bash localhost/${COMPONENT_NAME}:latest 

@@ -90,7 +90,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/train_yolo_optuna:latest
+        image: quay.io/atarazana/train_yolo_optuna:v1.0.0
 pipelineInfo:
   name: train-model-optuna
 root:

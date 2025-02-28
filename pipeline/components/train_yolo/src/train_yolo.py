@@ -1,19 +1,16 @@
 import os
-from re import L
 
 from kfp import compiler
 
 from kfp.dsl import Output, Metrics, OutputPath
 from kfp import dsl
 
-BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
-# BASE_IMAGE="python:3.11-slim-bullseye"
-
 NAMESPACE = os.environ.get("NAMESPACE", "default")
-
+COMPONENT_NAME=os.getenv("COMPONENT_NAME", f"train_yolo")
+BASE_IMAGE=os.getenv("BASE_IMAGE", "quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111")
 REGISTRY=os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.svc:5000/{NAMESPACE}")
-
-TARGET_IMAGE=f"{REGISTRY}/train_yolo:latest"
+TAG=os.environ.get("TAG", f"latest")
+TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
 ULTRALYTICS_PIP_VERSION="8.3.22"
 LOAD_DOTENV_PIP_VERSION="0.1.0"

@@ -17,5 +17,11 @@ COMPONENT_NAME=$1
 # Source the component-specific environment variables if the file exists
 [ -f ${COMPONENT_NAME}/.env ] && . ${COMPONENT_NAME}/.env
 
-podman tag localhost/${COMPONENT_NAME}:latest quay.io/atarazana/${COMPONENT_NAME}:latest
-podman push quay.io/atarazana/${COMPONENT_NAME}:latest
+# Print info
+echo "COMPONENT_NAME: ${COMPONENT_NAME}"
+echo "BASE_IMAGE: ${BASE_IMAGE}"
+echo "REGISTRY: ${REGISTRY}"
+echo "TAG: ${TAG}"
+
+podman tag localhost/${COMPONENT_NAME}:${TAG} ${REGISTRY}/${COMPONENT_NAME}:${TAG}
+podman push ${REGISTRY}/${COMPONENT_NAME}:${TAG}

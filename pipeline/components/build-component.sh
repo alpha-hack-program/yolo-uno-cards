@@ -17,12 +17,21 @@ COMPONENT_NAME=$1
 # Source the component-specific environment variables if the file exists
 [ -f ${COMPONENT_NAME}/.env ] && . ${COMPONENT_NAME}/.env
 
+# Print info
+echo "COMPONENT_NAME: ${COMPONENT_NAME}"
+echo "BASE_IMAGE: ${BASE_IMAGE}"
+echo "REGISTRY: ${REGISTRY}"
+echo "TAG: ${TAG}"
+export COMPONENT_NAME
+export BASE_IMAGE
+export REGISTRY
+export TAG
+
 # Build the image using the BASE_IMAGE build arg
-podman build -t ${COMPONENT_NAME}:latest -f ./Containerfile . \
+podman build -t ${COMPONENT_NAME}:${TAG} -f ./Containerfile . \
   --build-arg BASE_IMAGE=${BASE_IMAGE} \
   --build-arg COMPONENT_NAME=${COMPONENT_NAME}
 
 # Build the component using the kfp CLI
 export PYTHONPATH=${PYTHONPATH}:$(pwd)/${COMPONENT_NAME}/src:$(pwd)/shared
-export REGISTRY
 kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image

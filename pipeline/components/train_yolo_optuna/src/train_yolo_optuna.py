@@ -18,23 +18,20 @@ from shared.experiment_reports import download_experiment_report, load_yaml
 from shared.kubeflow import get_pipeline_id_by_name, get_pipeline, create_experiment, create_run, get_token, get_route_host
 # from utils import get_route_host, get_token, get_pipeline, get_pipeline_id_by_name, download_experiment_report, create_experiment, create_run, load_yaml
 
-COMPONENT_NAME=os.getenv("COMPONENT_NAME", "train_yolo_optuna")
-
-DATASETS_CONNECTION_SECRET = "aws-connection-datasets"
-MODELS_CONNECTION_SECRET = "aws-connection-models"
-
-BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
-
 NAMESPACE = os.environ.get("NAMESPACE", "default")
-
+COMPONENT_NAME=os.getenv("COMPONENT_NAME", "train_yolo_optuna")
+BASE_IMAGE=os.getenv("BASE_IMAGE", "quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111")
 REGISTRY=os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.svc:5000/{NAMESPACE}")
-
-TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:latest"
+TAG=os.environ.get("TAG", f"latest")
+TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
 KFP_PIP_VERSION="2.8.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 LOAD_DOTENV_PIP_VERSION="0.1.0"
+
+DATASETS_CONNECTION_SECRET = "aws-connection-datasets"
+MODELS_CONNECTION_SECRET = "aws-connection-models"
 
 # Define the objective function
 def objective(trial: optuna.Trial, 

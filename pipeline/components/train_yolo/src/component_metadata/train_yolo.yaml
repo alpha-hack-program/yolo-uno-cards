@@ -99,7 +99,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/train_yolo:latest
+        image: quay.io/atarazana/train_yolo:v1.0.1
 pipelineInfo:
   name: train-yolo
 root:
