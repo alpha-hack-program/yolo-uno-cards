@@ -61,7 +61,10 @@ def yield_not_deployed_error():
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301"
 )
-def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)):
+def parse_metrics(
+    metrics_input: Input[Metrics], 
+    map75_output: OutputPath(float) # type: ignore
+):
     print(f"metrics_input: {dir(metrics_input)}")
     map75 = metrics_input.metadata["val/map75"]
 
@@ -88,10 +91,28 @@ def create_serialized_labels(
     confidence_threshold: float,
     iou_threshold: float,
     label_smoothing: float,
-    tags: str
+    tags: str,
+    input_metrics: Input[Metrics],         # Input metrics
 ) -> str:
     import json
 
+    # Function that generates a Dict from an Input[Metrics] object
+    def metrics_to_dict(metrics_input: Input[Metrics]) -> dict:
+        # Inspecting the Input[Metrics] object
+        print(f"metrics_input: {metrics_input}")
+        print(f"metrics_input.metadata: {metrics_input.metadata}")
+
+        # Get all key:values from metrics_input.metadata
+        metrics_dict = {}
+        for key, value in metrics_input.metadata.items():
+            metrics_dict[key] = value
+        
+        # Print the metrics_dict
+        print(f"metrics_dict: {metrics_dict}")
+
+        # Return the metrics_dict
+        return metrics_dict
+        
     # Create a dictionary with the labels
     labels_dict = {
         "dataset": images_dataset_name,
@@ -118,6 +139,16 @@ def create_serialized_labels(
             tag = tag.strip()
             labels_dict[tag] = ""
 
+    # If there are input metrics, add them to the labels_dict
+    if input_metrics:
+        # Generate metadata from the input metrics
+        metrics_dict = metrics_to_dict(input_metrics)
+
+        # Add each key:value pair from the metrics_dict to the labels_dict
+        for key, value in metrics_dict.items():
+            labels_dict[key] = value
+
+    # Return the labels_dict as a JSON string
     return json.dumps(labels_dict)
 
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
@@ -239,24 +270,6 @@ def pipeline(
     model_onnx_s3_uri = upload_model_task.outputs["model_onnx_s3_uri_output"]
     model_pt_s3_uri = upload_model_task.outputs["model_pt_s3_uri_output"]
 
-    # Upload the experiment report
-    upload_experiment_report_component_task = upload_experiment_report_component(
-        experiment_name=experiment_name,
-        run_name=run_name,
-        metric_value=metric_value,
-        model_name=model_name, 
-        image_size=image_size, 
-        epochs=epochs,
-        batch_size=batch_size,
-        optimizer=optimizer,
-        learning_rate=learning_rate,
-        momentum=momentum,
-        weight_decay=weight_decay,
-        confidence_threshold=confidence_threshold,
-        iou_threshold=iou_threshold,
-        label_smoothing=label_smoothing,
-    ).after(train_model_task).set_caching_options(False)
-
     # Create labels through helper component
     create_labels_task = create_serialized_labels(
         images_dataset_name=images_dataset_name,
@@ -274,9 +287,11 @@ def pipeline(
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
         label_smoothing=label_smoothing,
-        tags=model_tags
+        tags=model_tags,
+        input_metrics=train_model_task.outputs["results_output_metrics"]
     ).after(train_model_task)
 
+    # Prepare the model registry parameters
     model_registry_name = model_registry_name
     istio_system_namespace = istio_system_namespace
     model_name = experiment_name
@@ -287,17 +302,6 @@ def pipeline(
     model_format_version = "1"
     author = author
     owner = owner
-
-    labels = {
-        "vision": "",
-        "yolo": "",
-        "uno-cards": "",
-        "dataset": images_dataset_name,
-        "dataset_uri": dataset_s3_uri,
-        "experiment": experiment_name,
-        "run": run_name,
-        "metric_value": metric_value,
-    }
 
     # Register model
     register_model_task = register_model_component(
@@ -312,7 +316,36 @@ def pipeline(
         author=author,
         owner=owner,
         labels=create_labels_task.outputs["Output"],
-        input_metrics=train_model_task.outputs["results_output_metrics"],
+        input_metrics=None,
+    ).after(train_model_task).set_caching_options(False)
+
+    # Upload the experiment report
+    upload_experiment_report_component_task = upload_experiment_report_component(
+        experiment_name=experiment_name,
+        run_name=run_name,
+        metric_value=metric_value,
+        model_registry_name=model_registry_name,
+        model_name=model_name,
+        model_version=model_version,
+        model_id=register_model_task.outputs["output_model_id"],
+        model_version_id=register_model_task.outputs["output_model_version_id"],
+        model_uri=model_uri,
+        model_description=model_description,
+        model_format_name=model_format_name,
+        model_format_version=model_format_version,
+        model_author=author,
+        model_owner=owner,
+        model_labels=create_labels_task.outputs["Output"],
+        image_size=image_size, 
+        epochs=epochs,
+        batch_size=batch_size,
+        optimizer=optimizer,
+        learning_rate=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        confidence_threshold=confidence_threshold,
+        iou_threshold=iou_threshold,
+        label_smoothing=label_smoothing,
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 

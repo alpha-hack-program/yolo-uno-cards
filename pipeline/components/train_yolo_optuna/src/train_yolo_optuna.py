@@ -3,7 +3,6 @@
 import json
 import os
 
-from cv2 import exp
 from kfp import dsl
 from kfp.dsl import Output, Metrics
 
@@ -15,7 +14,9 @@ import optuna
 
 from kfp import client as kfp_cli
 
-from utils import get_route_host, get_token, get_pipeline, get_pipeline_id_by_name, download_experiment_report, create_experiment, create_run, load_yaml
+from shared.experiment_reports import download_experiment_report, load_yaml
+from shared.kubeflow import get_pipeline_id_by_name, get_pipeline, create_experiment, create_run, get_token, get_route_host
+# from utils import get_route_host, get_token, get_pipeline, get_pipeline_id_by_name, download_experiment_report, create_experiment, create_run, load_yaml
 
 COMPONENT_NAME=os.getenv("COMPONENT_NAME", "train_yolo_optuna")
 

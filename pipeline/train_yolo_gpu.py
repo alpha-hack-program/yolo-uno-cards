@@ -239,24 +239,6 @@ def pipeline(
     model_onnx_s3_uri = upload_model_task.outputs["model_onnx_s3_uri_output"]
     model_pt_s3_uri = upload_model_task.outputs["model_pt_s3_uri_output"]
 
-    # Upload the experiment report
-    upload_experiment_report_component_task = upload_experiment_report_component(
-        experiment_name=experiment_name,
-        run_name=run_name,
-        metric_value=metric_value,
-        model_name=model_name, 
-        image_size=image_size, 
-        epochs=epochs,
-        batch_size=batch_size,
-        optimizer=optimizer,
-        learning_rate=learning_rate,
-        momentum=momentum,
-        weight_decay=weight_decay,
-        confidence_threshold=confidence_threshold,
-        iou_threshold=iou_threshold,
-        label_smoothing=label_smoothing,
-    ).after(train_model_task).set_caching_options(False)
-
     # Create labels through helper component
     create_labels_task = create_serialized_labels(
         images_dataset_name=images_dataset_name,
@@ -277,6 +259,7 @@ def pipeline(
         tags=model_tags
     ).after(train_model_task)
 
+    # Prepare the model registry parameters
     model_registry_name = model_registry_name
     istio_system_namespace = istio_system_namespace
     model_name = experiment_name
@@ -302,6 +285,28 @@ def pipeline(
         owner=owner,
         labels=create_labels_task.outputs["Output"],
         input_metrics=train_model_task.outputs["results_output_metrics"],
+    ).after(train_model_task).set_caching_options(False)
+
+    # Upload the experiment report
+    upload_experiment_report_component_task = upload_experiment_report_component(
+        experiment_name=experiment_name,
+        run_name=run_name,
+        metric_value=metric_value,
+        model_registry_name=model_registry_name,
+        model_name=model_name,
+        model_version=model_version,
+        model_id=register_model_task.outputs["output_model_id"],
+        model_version_id=register_model_task.outputs["output_model_version_id"],
+        image_size=image_size, 
+        epochs=epochs,
+        batch_size=batch_size,
+        optimizer=optimizer,
+        learning_rate=learning_rate,
+        momentum=momentum,
+        weight_decay=weight_decay,
+        confidence_threshold=confidence_threshold,
+        iou_threshold=iou_threshold,
+        label_smoothing=label_smoothing,
     ).after(train_model_task).set_caching_options(False)
 
     # Mount the PVC to the task 

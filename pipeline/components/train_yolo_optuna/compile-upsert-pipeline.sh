@@ -1,8 +1,12 @@
 #!/bin/bash
 
-export COMPONENT_NAME=train_yolo
+export COMPONENT_NAME=train_yolo_optuna
 export ORG=atarazana
 export REGISTRY=quay.io/${ORG}
+
+export PYTHONPATH=$(pwd)/src:${PYTHONPATH}
+
+COMPILED_COMPONENT=$(pwd)/component_metadata/${COMPONENT_NAME}.yaml
 
 DATA_SCIENCE_PROJECT_NAMESPACE=$(oc project --short)
 
@@ -19,7 +23,7 @@ if [ -z "$TOKEN" ]; then
   echo "Error: No token found. Please login to OpenShift using 'oc login' command."
   echo "Compile only mode."
 
-  python train_yolo_component.py
+  python pipeline.py
 
   exit 1
 fi
@@ -34,7 +38,7 @@ if [ -z "$DSPA_HOST" ]; then
   exit 1
 fi
 
-python train_yolo_component.py $TOKEN $DSPA_HOST
+python pipeline.py $TOKEN $DSPA_HOST
 
 
 

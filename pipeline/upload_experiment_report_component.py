@@ -1,6 +1,6 @@
 from kfp import compiler
 
-from kfp.dsl import Input, component
+from kfp.dsl import Input, component, Metrics
 
 # This component generates a yaml report and saves it in a bucket
 # - AWS_ACCESS_KEY_ID
@@ -20,7 +20,18 @@ def upload_experiment_report(
     experiment_name: str,
     run_name: str,
     metric_value: float,
-    model_name: str, 
+    model_registry_name: str,
+    model_name: str,
+    model_version: str,
+    model_id: str,
+    model_version_id: str,
+    model_uri: str,
+    model_description: str,
+    model_format_name: str,
+    model_format_version: str,
+    model_author: str,
+    model_owner: str,
+    model_labels: str,
     image_size: int, 
     epochs: int, 
     batch_size: int,
@@ -91,6 +102,19 @@ def upload_experiment_report(
     experiment_report_str = f"report:\n  experiment_name: {experiment_name}"
     experiment_report_str += f"\n  run_name: {run_name}"
     experiment_report_str += f"\n  metric_value: {metric_value}"
+    experiment_report_str += f"\n  model_card:"
+    experiment_report_str += f"\n    model_registry_name: {model_registry_name}"
+    experiment_report_str += f"\n    model_name: {model_name}"
+    experiment_report_str += f"\n    model_version: {model_version}"
+    experiment_report_str += f"\n    model_id: {model_id}"
+    experiment_report_str += f"\n    model_version_id: {model_version_id}"
+    experiment_report_str += f"\n    model_uri: {model_uri}"
+    experiment_report_str += f"\n    model_description: {model_description}"
+    experiment_report_str += f"\n    model_format_name: {model_format_name}"
+    experiment_report_str += f"\n    model_format_version: {model_format_version}"
+    experiment_report_str += f"\n    model_author: {model_author}"
+    experiment_report_str += f"\n    model_owner: {model_owner}"
+    experiment_report_str += f"\n    model_labels: {model_labels}" # labels as json string
     experiment_report_str += f"\n  params:"
     experiment_report_str += f"\n    model_name: {model_name}"
     experiment_report_str += f"\n    image_size: {image_size}"

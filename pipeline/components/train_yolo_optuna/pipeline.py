@@ -1,17 +1,10 @@
 # DOCS: https://www.kubeflow.org/docs/components/pipelines/user-guides/components/ 
 
 import os
-import sys
-import time
 
-import kfp
-
-from kfp import compiler
 from kfp import dsl
 
 from kfp import kubernetes
-
-from src.utils import get_pipeline_id_by_name, get_route_host, get_token
 
 from src.train_yolo_optuna import train_model_optuna
 
@@ -236,67 +229,18 @@ def pipeline(
     )
 
 if __name__ == '__main__':
-    import time
-    import sys
+    from shared.kubeflow import compile_and_upsert_pipeline
+    
     import os
-
-    from kfp import compiler
 
     pipeline_package_path = __file__.replace('.py', '.yaml')
 
-    compiler.Compiler().compile(
-        pipeline_func=pipeline,
-        package_path=pipeline_package_path,
-    )
-
-    # Take token and kfp_endpoint as optional command-line arguments
-    token = sys.argv[1] if len(sys.argv) > 1 else None
-    kfp_endpoint = sys.argv[2] if len(sys.argv) > 2 else None
-
-    if not token:
-        print("Token endpoint not provided finding it automatically.")
-        token = get_token()
-
-    if not kfp_endpoint:
-        print("KFP endpoint not provided finding it automatically.")
-        kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
-
     # Pipeline name
-    # pipeline_name = os.path.basename(__file__).replace('.py', '')
     pipeline_name=f"{COMPONENT_NAME}_pl"
 
-    # If both kfp_endpoint and token are provided, upload the pipeline
-    if kfp_endpoint and token:
-        client = kfp.Client(host=kfp_endpoint, existing_token=token)
+    compile_and_upsert_pipeline(
+        pipeline_func=pipeline,
+        pipeline_package_path=pipeline_package_path,
+        pipeline_name=pipeline_name
+    )
 
-        # If endpoint doesn't have a protocol (http or https), add https
-        if not kfp_endpoint.startswith("http"):
-            kfp_endpoint = f"https://{kfp_endpoint}"
-
-        try:
-            # Get the pipeline by name
-            print(f"Pipeline name: {pipeline_name}")
-            pipeline_id = get_pipeline_id_by_name(client, pipeline_name)
-            if pipeline_id:
-                print(f"Pipeline {pipeline_id} already exists. Uploading a new version.")
-                # Upload a new version of the pipeline with a version name equal to the pipeline package path plus a timestamp
-                pipeline_version_name=f"{pipeline_name}-{int(time.time())}"
-                client.upload_pipeline_version(
-                    pipeline_package_path=pipeline_package_path,
-                    pipeline_id=pipeline_id,
-                    pipeline_version_name=pipeline_version_name
-                )
-                print(f"Pipeline version uploaded successfully to {kfp_endpoint}")
-            else:
-                print(f"Pipeline {pipeline_name} does not exist. Uploading a new pipeline.")
-                print(f"Pipeline package path: {pipeline_package_path}")
-                # Upload the compiled pipeline
-                client.upload_pipeline(
-                    pipeline_package_path=pipeline_package_path,
-                    pipeline_name=pipeline_name
-                )
-                print(f"Pipeline uploaded successfully to {kfp_endpoint}")
-        except Exception as e:
-            print(f"Failed to upload the pipeline: {e}")
-    else:
-        print("KFP endpoint or token not provided. Skipping pipeline upload.")

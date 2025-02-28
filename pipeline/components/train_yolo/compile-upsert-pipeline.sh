@@ -6,9 +6,7 @@ export REGISTRY=quay.io/${ORG}
 
 export PYTHONPATH=$(pwd)/src:${PYTHONPATH}
 
-./build.sh
-./push.sh
-
+COMPILED_COMPONENT=$(pwd)/component_metadata/${COMPONENT_NAME}.yaml
 
 DATA_SCIENCE_PROJECT_NAMESPACE=$(oc project --short)
 

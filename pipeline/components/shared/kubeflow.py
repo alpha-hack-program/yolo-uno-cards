@@ -1,20 +1,14 @@
 import os
-import yaml
+import time
+import sys
 
 from typing import Optional
 
-import boto3
-import botocore
-
 from kubernetes import client as k8s_cli, config as k8s_conf
-from kfp import client as kfp_cli
 
-aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
-aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
-endpoint_url = os.environ.get('AWS_S3_ENDPOINT')
-region_name = os.environ.get('AWS_DEFAULT_REGION')
-bucket_name = os.environ.get('AWS_S3_BUCKET')
-experiment_reports_folder = os.environ.get('EXPERIMENT_REPORTS_FOLDER_S3_KEY')
+import kfp
+from kfp import client as kfp_cli, compiler
+from kfp.dsl import base_component
 
 # Get token path from environment or default to kubernetes token location
 TOKEN_PATH = os.environ.get("TOKEN_PATH", "/var/run/secrets/kubernetes.io/serviceaccount/token")
@@ -107,50 +101,63 @@ def create_run(client: kfp_cli.Client, pipeline_id: str, experiment_id: str, run
     print(f"run: {run}")
     return run.run_id
 
-# Download experiment report from S3 bucket and folder
-def download_experiment_report(experiment_name: str) -> dict:
-    # Experiment report s3 key to store the report
-    experiment_report_file_name = f"{experiment_name}.yaml"
-    experiment_report_s3_key = f"{experiment_reports_folder}/{experiment_report_file_name}"
-    print(f"experiment_report_s3_key = {experiment_report_s3_key}")
-        # Create a session using the provided credentials and region
-    session = boto3.session.Session(
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key
-    )
-
-    # Create an S3 resource object using the session and region
-    s3_resource = session.resource(
-        's3',
-        config=botocore.client.Config(signature_version='s3v4'),
-        endpoint_url=endpoint_url,
-        region_name=region_name
-    )
-
-    # Get the bucket
-    bucket = s3_resource.Bucket(bucket_name)
-
-    # Create a temporary directory to store the report
-    local_tmp_dir = '/tmp/experiment_report'
-    print(f">>> local_tmp_dir: {local_tmp_dir}")
+# Function that compiles and upserts a pipeline
+def compile_and_upsert_pipeline(
+        pipeline_func: base_component.BaseComponent,
+        pipeline_package_path: str,
+        pipeline_name: str) -> str:
     
-    # Ensure local_tmp_dir exists
-    if not os.path.exists(local_tmp_dir):
-        os.makedirs(local_tmp_dir)
+    # Compile the pipeline
+    compiler.Compiler().compile(
+        pipeline_func=pipeline_func,
+        package_path=pipeline_package_path,
+    )
 
-    # Local file to store the report
-    experiment_report_file_path = f'{local_tmp_dir}/{experiment_report_file_name}'
+    # Take token and kfp_endpoint as optional command-line arguments
+    token = sys.argv[1] if len(sys.argv) > 1 else None
+    kfp_endpoint = sys.argv[2] if len(sys.argv) > 2 else None
 
-    print(f"Downloading {experiment_report_s3_key} to {experiment_report_file_path}")
-    bucket.download_file(experiment_report_s3_key, experiment_report_file_path)
-    print(f"Downloaded {experiment_report_s3_key}")
+    if not token:
+        print("Token endpoint not provided finding it automatically.")
+        token = get_token()
 
-    # Read the content of the file and retun it
-    experiment_report = None
-    with open(experiment_report_file_path, 'r') as file:
-        experiment_report = file.read()
-    return load_yaml(experiment_report)
+    if not kfp_endpoint:
+        print("KFP endpoint not provided finding it automatically.")
+        kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
 
-# Return a dict from a yaml string
-def load_yaml(search_space: str) -> dict:
-    return yaml.safe_load(search_space)
+    # If both kfp_endpoint and token are provided, upload the pipeline
+    if kfp_endpoint and token:
+        client = kfp.Client(host=kfp_endpoint, existing_token=token)
+
+        # If endpoint doesn't have a protocol (http or https), add https
+        if not kfp_endpoint.startswith("http"):
+            kfp_endpoint = f"https://{kfp_endpoint}"
+
+        try:
+            # Get the pipeline by name
+            print(f"Pipeline name: {pipeline_name}")
+            pipeline_id = get_pipeline_id_by_name(client, pipeline_name)
+            if pipeline_id:
+                print(f"Pipeline {pipeline_id} already exists. Uploading a new version.")
+                # Upload a new version of the pipeline with a version name equal to the pipeline package path plus a timestamp
+                pipeline_version_name=f"{pipeline_name}-{int(time.time())}"
+                client.upload_pipeline_version(
+                    pipeline_package_path=pipeline_package_path,
+                    pipeline_id=pipeline_id,
+                    pipeline_version_name=pipeline_version_name
+                )
+                print(f"Pipeline version uploaded successfully to {kfp_endpoint}")
+            else:
+                print(f"Pipeline {pipeline_name} does not exist. Uploading a new pipeline.")
+                print(f"Pipeline package path: {pipeline_package_path}")
+                # Upload the compiled pipeline
+                client.upload_pipeline(
+                    pipeline_package_path=pipeline_package_path,
+                    pipeline_name=pipeline_name
+                )
+                print(f"Pipeline uploaded successfully to {kfp_endpoint}")
+        except Exception as e:
+            print(f"Failed to upload the pipeline: {e}")
+    else:
+        print("KFP endpoint or token not provided. Skipping pipeline upload.")
+

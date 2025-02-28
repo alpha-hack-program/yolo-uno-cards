@@ -23,6 +23,10 @@ KFP_PIP_VERSION="2.8.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 
+# Load the register model from a url
+REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
+register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
+
 # Load the train_yolo_optuna component from a url
 TRAIN_YOLO_OPTUNA_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/yolo-uno-cards/refs/heads/main/pipeline/components/train_yolo_optuna_component/src/component_metadata/train_model_optuna.yaml"
 train_yolo_optuna_component = kfp.components.load_component_from_url(TRAIN_YOLO_OPTUNA_COMPONENT_URL)
@@ -229,6 +233,22 @@ def pipeline(
         model_registry_name=model_registry_name,
         istio_system_namespace=istio_system_namespace
     ).set_caching_options(False).after(check_env_task)
+
+    # # Register model in production
+    # register_model_task = register_model_component(
+    #     model_registry_name=model_registry_name,
+    #     istio_system_namespace=istio_system_namespace,
+    #     model_name=model_name,
+    #     model_uri=model_uri,
+    #     model_version=model_version,
+    #     model_description=model_description,
+    #     model_format_name=model_format_name,
+    #     model_format_version=model_format_version,
+    #     author=author,
+    #     owner=owner,
+    #     labels=create_labels_task.outputs["Output"],
+    #     input_metrics=train_model_task.outputs["results_output_metrics"],
+    # ).after(train_model_task).set_caching_options(False)
 
     # Setting environment variables for train_model_task
     train_model_task.set_env_variable(name="EXPERIMENT_REPORTS_FOLDER_S3_KEY", value="experiment-reports")
