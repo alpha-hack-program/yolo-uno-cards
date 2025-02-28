@@ -178,7 +178,7 @@ def objective(trial: optuna.Trial,
     target_image=TARGET_IMAGE,
     packages_to_install=[f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}", f"optuna=={OPTUNA_PIP_VERSION}", f"kfp[kubernetes]=={KFP_PIP_VERSION}", f"kubernetes=={K8S_PIP_VERSION}"]
 )
-def train_model_optuna(
+def train_yolo_optuna(
     model_name: str,                    # e.g: yolov8n
     n_trials: int,                      # e.g: 5
     search_space: str,

@@ -6,7 +6,7 @@ from kfp import dsl
 
 from kfp import kubernetes
 
-from src.train_yolo_optuna import train_model_optuna
+from src.train_yolo_optuna import train_yolo_optuna
 
 COMPONENT_NAME=os.getenv("COMPONENT_NAME")
 print(f"COMPONENT_NAME: {COMPONENT_NAME}")
@@ -142,7 +142,7 @@ def generate_search_space(
 # upload the model to another S3 bucket.
 @dsl.pipeline(name=os.path.basename(__file__).replace('.py', ''))
 def pipeline(
-    experiment_name_prefix: str = "yolo-uno-cards",
+    experiment_name_prefix: str = "uno-cards",
     model_name: str = "yolov8n", 
     n_trials: int = 3,
     epochs_type: str = "categorical",
@@ -171,7 +171,12 @@ def pipeline(
     images_dataset_yaml: str = "data.yaml",
     models_root_folder: str = "models",
     images_dataset_pvc_name: str = "images-datasets-pvc",
-    images_dataset_pvc_size_in_gi: int = 5):
+    images_dataset_pvc_size_in_gi: int = 5,
+    author: str = "John Doe",
+    owner: str = "acme",
+    model_tags: str = "vision, yolo, uno-cards",
+    model_registry_name: str = "model-registry-dev",
+    istio_system_namespace: str = "istio-system"):
 
     check_env_task = check_env()
     
@@ -200,7 +205,7 @@ def pipeline(
     ).set_caching_options(False)
 
     # Train the model
-    train_model_task = train_model_optuna(
+    train_yolo_optuna_task = train_yolo_optuna(
         model_name=model_name,
         n_trials=n_trials,
         search_space=generate_search_space_task.outputs["Output"],
@@ -211,13 +216,18 @@ def pipeline(
         images_dataset_yaml=images_dataset_yaml,
         models_root_folder=models_root_folder,
         images_dataset_pvc_name=images_dataset_pvc_name,
-        images_dataset_pvc_size_in_gi=images_dataset_pvc_size_in_gi
+        images_dataset_pvc_size_in_gi=images_dataset_pvc_size_in_gi,
+        author=author,
+        owner=owner,
+        model_tags=model_tags,
+        model_registry_name=model_registry_name,
+        istio_system_namespace=istio_system_namespace
     ).set_caching_options(False).after(check_env_task)
 
     # Setting environment variables for train_model_task
-    train_model_task.set_env_variable(name="EXPERIMENT_REPORTS_FOLDER_S3_KEY", value="experiment-reports")
+    train_yolo_optuna_task.set_env_variable(name="EXPERIMENT_REPORTS_FOLDER_S3_KEY", value="experiment-reports")
     kubernetes.use_secret_as_env(
-        task=train_model_task,
+        task=train_yolo_optuna_task,
         secret_name=MODELS_CONNECTION_SECRET,
         secret_key_to_env={
             'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',

@@ -1,13 +1,14 @@
 # PIPELINE DEFINITION
 # Name: pipeline
 # Inputs:
+#    author: str [Default: 'John Doe']
 #    batch_size_bounds: str [Default: '8, 16, 32']
 #    batch_size_type: str [Default: 'categorical']
 #    confidence_threshold_bounds: str [Default: '0.001, 0.005']
 #    confidence_threshold_type: str [Default: 'uniform']
 #    epochs_bounds: str [Default: '2']
 #    epochs_type: str [Default: 'categorical']
-#    experiment_name_prefix: str [Default: 'yolo-uno-cards']
+#    experiment_name_prefix: str [Default: 'uno-cards']
 #    image_size_bounds: str [Default: '640']
 #    image_size_type: str [Default: 'categorical']
 #    images_dataset_name: str [Default: 'uno-cards-v1.2']
@@ -17,20 +18,26 @@
 #    images_datasets_root_folder: str [Default: 'datasets']
 #    iou_threshold_bounds: str [Default: '0.4, 0.6']
 #    iou_threshold_type: str [Default: 'uniform']
+#    istio_system_namespace: str [Default: 'istio-system']
 #    label_smoothing_bounds: str [Default: '0.07, 0.2']
 #    label_smoothing_type: str [Default: 'uniform']
 #    lr_bounds: str [Default: '0.001, 0.01']
 #    lr_type: str [Default: 'float']
 #    model_name: str [Default: 'yolov8n']
+#    model_registry_name: str [Default: 'model-registry-dev']
+#    model_tags: str [Default: 'vision, yolo, uno-cards']
 #    models_root_folder: str [Default: 'models']
 #    momentum_bounds: str [Default: '0.9, 0.99']
 #    momentum_type: str [Default: 'uniform']
 #    n_trials: int [Default: 3.0]
 #    optimizer_bounds: str [Default: 'Adam']
 #    optimizer_type: str [Default: 'categorical']
+#    owner: str [Default: 'acme']
 #    pipeline_name: str [Default: 'train_yolo']
 #    weight_decay_bounds: str [Default: '0.0005, 0.001']
 #    weight_decay_type: str [Default: 'float']
+# Outputs:
+#    train-yolo-optuna-results_output_metrics: system.Metrics
 components:
   comp-check-env:
     executorLabel: exec-check-env
@@ -86,43 +93,52 @@ components:
       parameters:
         Output:
           parameterType: STRING
-  comp-train-model-optuna:
-    executorLabel: exec-train-model-optuna
+  comp-train-yolo-optuna:
+    executorLabel: exec-train-yolo-optuna
     inputDefinitions:
       parameters:
+        author:
+          parameterType: STRING
         experiment_name_prefix:
           parameterType: STRING
         images_dataset_name:
-          defaultValue: uno-cards-v1.2
-          isOptional: true
           parameterType: STRING
         images_dataset_pvc_name:
-          defaultValue: images-datasets-pvc
-          isOptional: true
           parameterType: STRING
         images_dataset_pvc_size_in_gi:
-          defaultValue: 5.0
-          isOptional: true
           parameterType: NUMBER_INTEGER
         images_dataset_yaml:
-          defaultValue: data.yaml
-          isOptional: true
           parameterType: STRING
         images_datasets_root_folder:
-          defaultValue: datasets
-          isOptional: true
+          parameterType: STRING
+        istio_system_namespace:
           parameterType: STRING
         model_name:
           parameterType: STRING
+        model_registry_name:
+          parameterType: STRING
+        model_tags:
+          parameterType: STRING
         models_root_folder:
-          defaultValue: models
-          isOptional: true
           parameterType: STRING
         n_trials:
           parameterType: NUMBER_INTEGER
+        owner:
+          parameterType: STRING
         pipeline_name:
           parameterType: STRING
         search_space:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        results_output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+      parameters:
+        output_best_model_version:
+          parameterType: STRING
+        output_model_name:
           parameterType: STRING
 deploymentSpec:
   executors:
@@ -224,13 +240,13 @@ deploymentSpec:
           \   yaml_str = add_to_yaml(yaml_str, \"batch_size\", batch_size_type, batch_size_bounds)\n\
           \n    return yaml_str\n\n"
         image: quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111
-    exec-train-model-optuna:
+    exec-train-yolo-optuna:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - train_model_optuna
+        - train_yolo_optuna
         command:
         - sh
         - -c
@@ -245,11 +261,17 @@ deploymentSpec:
         env:
         - name: EXPERIMENT_REPORTS_FOLDER_S3_KEY
           value: experiment-reports
-        image: quay.io/atarazana/train_yolo_optuna:latest
+        image: quay.io/atarazana/train_yolo_optuna:v1.0.1
 pipelineInfo:
   name: pipeline
 root:
   dag:
+    outputs:
+      artifacts:
+        train-yolo-optuna-results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-yolo-optuna
     tasks:
       check-env:
         cachingOptions:
@@ -306,15 +328,17 @@ root:
               componentInputParameter: weight_decay_type
         taskInfo:
           name: generate-search-space
-      train-model-optuna:
+      train-yolo-optuna:
         cachingOptions: {}
         componentRef:
-          name: comp-train-model-optuna
+          name: comp-train-yolo-optuna
         dependentTasks:
         - check-env
         - generate-search-space
         inputs:
           parameters:
+            author:
+              componentInputParameter: author
             experiment_name_prefix:
               componentInputParameter: experiment_name_prefix
             images_dataset_name:
@@ -327,12 +351,20 @@ root:
               componentInputParameter: images_dataset_yaml
             images_datasets_root_folder:
               componentInputParameter: images_datasets_root_folder
+            istio_system_namespace:
+              componentInputParameter: istio_system_namespace
             model_name:
               componentInputParameter: model_name
+            model_registry_name:
+              componentInputParameter: model_registry_name
+            model_tags:
+              componentInputParameter: model_tags
             models_root_folder:
               componentInputParameter: models_root_folder
             n_trials:
               componentInputParameter: n_trials
+            owner:
+              componentInputParameter: owner
             pipeline_name:
               componentInputParameter: pipeline_name
             search_space:
@@ -340,9 +372,13 @@ root:
                 outputParameterKey: Output
                 producerTask: generate-search-space
         taskInfo:
-          name: train-model-optuna
+          name: train-yolo-optuna
   inputDefinitions:
     parameters:
+      author:
+        defaultValue: John Doe
+        isOptional: true
+        parameterType: STRING
       batch_size_bounds:
         defaultValue: 8, 16, 32
         isOptional: true
@@ -368,7 +404,7 @@ root:
         isOptional: true
         parameterType: STRING
       experiment_name_prefix:
-        defaultValue: yolo-uno-cards
+        defaultValue: uno-cards
         isOptional: true
         parameterType: STRING
       image_size_bounds:
@@ -407,6 +443,10 @@ root:
         defaultValue: uniform
         isOptional: true
         parameterType: STRING
+      istio_system_namespace:
+        defaultValue: istio-system
+        isOptional: true
+        parameterType: STRING
       label_smoothing_bounds:
         defaultValue: 0.07, 0.2
         isOptional: true
@@ -425,6 +465,14 @@ root:
         parameterType: STRING
       model_name:
         defaultValue: yolov8n
+        isOptional: true
+        parameterType: STRING
+      model_registry_name:
+        defaultValue: model-registry-dev
+        isOptional: true
+        parameterType: STRING
+      model_tags:
+        defaultValue: vision, yolo, uno-cards
         isOptional: true
         parameterType: STRING
       models_root_folder:
@@ -451,6 +499,10 @@ root:
         defaultValue: categorical
         isOptional: true
         parameterType: STRING
+      owner:
+        defaultValue: acme
+        isOptional: true
+        parameterType: STRING
       pipeline_name:
         defaultValue: train_yolo
         isOptional: true
@@ -463,6 +515,12 @@ root:
         defaultValue: float
         isOptional: true
         parameterType: STRING
+  outputDefinitions:
+    artifacts:
+      train-yolo-optuna-results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
 schemaVersion: 2.1.0
 sdkVersion: kfp-2.8.0
 ---
@@ -470,7 +528,7 @@ platforms:
   kubernetes:
     deploymentSpec:
       executors:
-        exec-train-model-optuna:
+        exec-train-yolo-optuna:
           secretAsEnv:
           - keyToEnv:
             - envVar: AWS_ACCESS_KEY_ID

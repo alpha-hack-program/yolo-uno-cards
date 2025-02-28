@@ -1,19 +1,29 @@
 #!/bin/bash
 
-export COMPONENT_NAME=train_yolo_optuna
-export ORG=atarazana
-export REGISTRY=quay.io/${ORG}
+# Load base environment
+. $(dirname "$(pwd)")/.env
 
-export PYTHONPATH=$(pwd)/src:${PYTHONPATH}
+# Source the component-specific environment variables if the file exists
+[ -f ./.env ] && . ./.env
 
-COMPILED_COMPONENT=$(pwd)/component_metadata/${COMPONENT_NAME}.yaml
+# COMPONENT_NAME should be the name of the folder in components folder
+export COMPONENT_NAME="$(basename "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)")"
 
-DATA_SCIENCE_PROJECT_NAMESPACE=$(oc project --short)
+echo "Compiling test pipeline for COMPONENT_NAME ${COMPONENT_NAME}"
 
-# If DATA_SCIENCE_PROJECT_NAMESPACE is empty print error and exit
-if [ -z "$DATA_SCIENCE_PROJECT_NAMESPACE" ]; then
-  echo "Error: No namespace found. Please set the namespace in bootstrap/.env file."
-  exit 1
+# Export variables needed while compiling the pipeline
+export BASE_IMAGE REGISTRY TAG
+export PYTHONPATH=$(pwd)/src:$(dirname "$(pwd)")
+
+COMPILED_COMPONENT=$(pwd)/src/component_metadata/${COMPONENT_NAME}.yaml
+
+# Check if COMPILED_COMPONENT file exists
+if [ -f "${COMPILED_COMPONENT}" ]; then
+    echo "COMPILED_COMPONENT ${COMPILED_COMPONENT} found."
+else
+    echo "COMPILED_COMPONENT ${COMPILED_COMPONENT} not found."
+    echo "Please go to $(dirname "$(pwd)") and run $ ./build-component.sh ${COMPONENT_NAME}"
+    exit 1
 fi
 
 TOKEN=$(oc whoami -t)
@@ -25,6 +35,14 @@ if [ -z "$TOKEN" ]; then
 
   python pipeline.py
 
+  exit 1
+fi
+
+DATA_SCIENCE_PROJECT_NAMESPACE=$(oc project --short)
+
+# If DATA_SCIENCE_PROJECT_NAMESPACE is empty print error and exit
+if [ -z "$DATA_SCIENCE_PROJECT_NAMESPACE" ]; then
+  echo "Error: No namespace found. Please set the namespace in bootstrap/.env file."
   exit 1
 fi
 

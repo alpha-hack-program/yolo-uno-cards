@@ -1,5 +1,5 @@
 # PIPELINE DEFINITION
-# Name: train-model-optuna
+# Name: train-yolo-optuna
 # Inputs:
 #    author: str
 #    experiment_name_prefix: str
@@ -21,10 +21,10 @@
 #    output_best_model_version: str
 #    output_model_name: str
 #    results_output_metrics: system.Metrics
-#    train-model-optuna-results_output_metrics: system.Metrics
+#    train-yolo-optuna-results_output_metrics: system.Metrics
 components:
-  comp-train-model-optuna:
-    executorLabel: exec-train-model-optuna
+  comp-train-yolo-optuna:
+    executorLabel: exec-train-yolo-optuna
     inputDefinitions:
       parameters:
         author:
@@ -72,13 +72,13 @@ components:
           parameterType: STRING
 deploymentSpec:
   executors:
-    exec-train-model-optuna:
+    exec-train-yolo-optuna:
       container:
         args:
         - --executor_input
         - '{{$}}'
         - --function_to_execute
-        - train_model_optuna
+        - train_yolo_optuna
         command:
         - sh
         - -c
@@ -90,9 +90,9 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/train_yolo_optuna:v1.0.0
+        image: quay.io/atarazana/train_yolo_optuna:v1.0.1
 pipelineInfo:
-  name: train-model-optuna
+  name: train-yolo-optuna
 root:
   dag:
     outputs:
@@ -100,26 +100,26 @@ root:
         results_output_metrics:
           artifactSelectors:
           - outputArtifactKey: results_output_metrics
-            producerSubtask: train-model-optuna
-        train-model-optuna-results_output_metrics:
+            producerSubtask: train-yolo-optuna
+        train-yolo-optuna-results_output_metrics:
           artifactSelectors:
           - outputArtifactKey: results_output_metrics
-            producerSubtask: train-model-optuna
+            producerSubtask: train-yolo-optuna
       parameters:
         output_best_model_version:
           valueFromParameter:
             outputParameterKey: output_best_model_version
-            producerSubtask: train-model-optuna
+            producerSubtask: train-yolo-optuna
         output_model_name:
           valueFromParameter:
             outputParameterKey: output_model_name
-            producerSubtask: train-model-optuna
+            producerSubtask: train-yolo-optuna
     tasks:
-      train-model-optuna:
+      train-yolo-optuna:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-train-model-optuna
+          name: comp-train-yolo-optuna
         inputs:
           parameters:
             author:
@@ -155,7 +155,7 @@ root:
             search_space:
               componentInputParameter: search_space
         taskInfo:
-          name: train-model-optuna
+          name: train-yolo-optuna
   inputDefinitions:
     parameters:
       author:
@@ -196,7 +196,7 @@ root:
         artifactType:
           schemaTitle: system.Metrics
           schemaVersion: 0.0.1
-      train-model-optuna-results_output_metrics:
+      train-yolo-optuna-results_output_metrics:
         artifactType:
           schemaTitle: system.Metrics
           schemaVersion: 0.0.1
