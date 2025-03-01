@@ -11,6 +11,7 @@ import kfp
 from kfp import compiler
 from kfp import dsl
 from kfp.dsl import Output, Metrics
+from kfp.components import load_component_from_file, load_component_from_url
 
 from kfp import kubernetes
 
@@ -25,11 +26,11 @@ OPTUNA_PIP_VERSION="4.1.0"
 
 # Load the register model from a url
 REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
-register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
+register_model_component = load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
-# Load the train_yolo_optuna component from a url
-TRAIN_YOLO_OPTUNA_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/yolo-uno-cards/refs/heads/main/pipeline/components/train_yolo_optuna_component/src/component_metadata/train_model_optuna.yaml"
-train_yolo_optuna_component = kfp.components.load_component_from_url(TRAIN_YOLO_OPTUNA_COMPONENT_URL)
+# Load train_yolo_optuna component
+# from components.train_yolo_optuna.src.train_yolo_optuna import train_yolo_optuna as train_yolo_optuna_component
+train_yolo_optuna_component = load_component_from_file('components/train_yolo_optuna/src/component_metadata/train_yolo_optuna.yaml')
 
 # This component checks the kfp env
 @dsl.component(

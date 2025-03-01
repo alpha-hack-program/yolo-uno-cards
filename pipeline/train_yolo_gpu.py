@@ -20,6 +20,11 @@ from kfp.components import load_component_from_file
 REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
 register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
+# Load train_yolo component
+# from components.train_yolo.src.train_yolo import train_yolo as train_yolo_component
+TRAIN_YOLO_COMPONENT_FILE_PATH='components/train_yolo/src/component_metadata/train_yolo.yaml'
+train_yolo_component = load_component_from_file(TRAIN_YOLO_COMPONENT_FILE_PATH)
+
 # Load the components from the files
 if not os.path.exists('setup_storage_component.yaml'):
     from setup_storage_component import main as setup_storage_main
@@ -30,11 +35,6 @@ if not os.path.exists('get_images_dataset_component.yaml'):
     from get_images_dataset_component import main as get_images_dataset_main
     get_images_dataset_main()
 get_images_dataset_component = load_component_from_file('get_images_dataset_component.yaml')
-
-if not os.path.exists('train_yolo_component.yaml'):
-    from train_yolo_component import main as train_yolo_main
-    train_yolo_main()
-train_yolo_component = load_component_from_file('train_yolo_component.yaml')
 
 if not os.path.exists('upload_model_component.yaml'):
     from upload_model_component import main as upload_model_main
@@ -57,17 +57,6 @@ MODELS_CONNECTION_SECRET = "aws-connection-models"
 def yield_not_deployed_error():
     raise ValueError("Model not deployed")
 
-# This component parses the metrics and extracts the accuracy
-@dsl.component(
-    base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301"
-)
-def parse_metrics(metrics_input: Input[Metrics], map75_output: OutputPath(float)):
-    print(f"metrics_input: {dir(metrics_input)}")
-    map75 = metrics_input.metadata["val/map75"]
-
-    with open(map75_output, 'w') as f:
-        f.write(str(map75))
-
 # Helper component for JSON serialization of labels
 @dsl.component(
     base_image="quay.io/modh/runtime-images:runtime-cuda-tensorflow-ubi9-python-3.9-2023b-20240301"
@@ -88,10 +77,28 @@ def create_serialized_labels(
     confidence_threshold: float,
     iou_threshold: float,
     label_smoothing: float,
-    tags: str
+    tags: str,
+    input_metrics: Input[Metrics],         # Input metrics
 ) -> str:
     import json
 
+    # Function that generates a Dict from an Input[Metrics] object
+    def metrics_to_dict(metrics_input: Input[Metrics]) -> dict:
+        # Inspecting the Input[Metrics] object
+        print(f"metrics_input: {metrics_input}")
+        print(f"metrics_input.metadata: {metrics_input.metadata}")
+
+        # Get all key:values from metrics_input.metadata
+        metrics_dict = {}
+        for key, value in metrics_input.metadata.items():
+            metrics_dict[key] = value
+        
+        # Print the metrics_dict
+        print(f"metrics_dict: {metrics_dict}")
+
+        # Return the metrics_dict
+        return metrics_dict
+    
     # Create a dictionary with the labels
     labels_dict = {
         "dataset": images_dataset_name,
@@ -118,6 +125,16 @@ def create_serialized_labels(
             tag = tag.strip()
             labels_dict[tag] = ""
 
+    # If there are input metrics, add them to the labels_dict
+    if input_metrics:
+        # Generate metadata from the input metrics
+        metrics_dict = metrics_to_dict(input_metrics)
+
+        # Add each key:value pair from the metrics_dict to the labels_dict
+        for key, value in metrics_dict.items():
+            labels_dict[key] = value
+
+    # Return the labels_dict as a JSON string
     return json.dumps(labels_dict)
 
 # This pipeline will download training dataset, download the model, test the model and if it performs well, 
@@ -256,7 +273,8 @@ def pipeline(
         confidence_threshold=confidence_threshold,
         iou_threshold=iou_threshold,
         label_smoothing=label_smoothing,
-        tags=model_tags
+        tags=model_tags,
+        input_metrics=train_model_task.outputs["results_output_metrics"]
     ).after(train_model_task)
 
     # Prepare the model registry parameters
@@ -283,8 +301,7 @@ def pipeline(
         model_format_version=model_format_version,
         author=author,
         owner=owner,
-        labels=create_labels_task.outputs["Output"],
-        input_metrics=train_model_task.outputs["results_output_metrics"],
+        labels=create_labels_task.outputs["Output"]
     ).after(train_model_task).set_caching_options(False)
 
     # Upload the experiment report
@@ -297,6 +314,13 @@ def pipeline(
         model_version=model_version,
         model_id=register_model_task.outputs["output_model_id"],
         model_version_id=register_model_task.outputs["output_model_version_id"],
+        model_uri=model_uri,
+        model_description=model_description,
+        model_format_name=model_format_name,
+        model_format_version=model_format_version,
+        model_author=author,
+        model_owner=owner,
+        model_labels=create_labels_task.outputs["Output"],
         image_size=image_size, 
         epochs=epochs,
         batch_size=batch_size,
@@ -378,11 +402,23 @@ def pipeline(
         task=train_model_task,
         secret_name=DATASETS_CONNECTION_SECRET,
         secret_key_to_env={
-            'AWS_ACCESS_KEY_ID': 'AWS_ACCESS_KEY_ID',
-            'AWS_SECRET_ACCESS_KEY': 'AWS_SECRET_ACCESS_KEY',
-            'AWS_DEFAULT_REGION': 'AWS_DEFAULT_REGION',
-            'AWS_S3_BUCKET': 'AWS_S3_BUCKET',
-            'AWS_S3_ENDPOINT': 'AWS_S3_ENDPOINT',
+            'AWS_ACCESS_KEY_ID': 'DATASETS_AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'DATASETS_AWS_SECRET_ACCESS_KEY',
+            'AWS_DEFAULT_REGION': 'DATASETS_AWS_DEFAULT_REGION',
+            'AWS_S3_BUCKET': 'DATASETS_AWS_S3_BUCKET',
+            'AWS_S3_ENDPOINT': 'DATASETS_AWS_S3_ENDPOINT',
+        }
+    )
+    train_model_task.set_env_variable(name="ULTRALYTICS_BASE_MODELS_FOLDER", value="ultralytics")
+    kubernetes.use_secret_as_env(
+        task=train_model_task,
+        secret_name=MODELS_CONNECTION_SECRET,
+        secret_key_to_env={
+            'AWS_ACCESS_KEY_ID': 'MODELS_AWS_ACCESS_KEY_ID',
+            'AWS_SECRET_ACCESS_KEY': 'MODELS_AWS_SECRET_ACCESS_KEY',
+            'AWS_DEFAULT_REGION': 'MODELS_AWS_DEFAULT_REGION',
+            'AWS_S3_BUCKET': 'MODELS_AWS_S3_BUCKET',
+            'AWS_S3_ENDPOINT': 'MODELS_AWS_S3_ENDPOINT',
         }
     )
 

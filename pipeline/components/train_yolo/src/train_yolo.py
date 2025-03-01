@@ -1,4 +1,7 @@
 import os
+import tempfile
+
+import boto3
 
 from kfp import compiler
 
@@ -18,13 +21,59 @@ NUMPY_PIP_VERSION="1.26.4"
 MLFLOW_PIP_VERSION="2.17.1"
 ONNXRUNTIME_PIP_VERSION="1.19.2"
 ONNXSLIM_PIP_VERSION="0.1.36"
+BOTOCORE_PIP_VERSION="1.35.54"
+BOTO3_PIP_VERSION="1.35.54"
 
+# Function that downloads the yolo model passed as an argument from an S3 bucket, saves it to a temporary folder
+# and returns the full path to it.
+# Arguments:
+# - endpoint_url: str      # S3 endpoint url
+# - region_name: str       # S3 region
+# - bucket_name: str       # S3 bucket
+# - yolo_model_s3_key: str # file key to the yolo model
+def download_yolo_model(
+        endpoint_url: str, 
+        region_name: str, 
+        bucket_name: str, 
+        base_models_folder: str,
+        model_file_name: str,
+        aws_access_key_id: str, 
+        aws_secret_access_key: str) -> str:
+    # Create an S3 client
+    s3 = boto3.client(
+        's3', 
+        endpoint_url=endpoint_url, 
+        region_name=region_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key
+    )
+    
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp()
+    
+    # Define the local file path
+    local_model_path = os.path.join(temp_dir, os.path.basename(model_file_name))
+    
+    try:
+        # Download the file from S3
+        yolo_model_s3_key = f"{base_models_folder}/{model_file_name}"
+        print(f"Downloading model from {yolo_model_s3_key} to {local_model_path}")
+        s3.download_file(bucket_name, yolo_model_s3_key, local_model_path)
+        print(f"Downloaded model {local_model_path}")
+    except s3.exceptions.NoSuchKey:
+        raise ValueError(f"The key '{yolo_model_s3_key}' was not found in bucket '{bucket_name}'.")
+    
+    return local_model_path
+
+# Function that trains a yolo base model with a dataset and a bunch of hyperparameters
 @dsl.component(
     base_image=BASE_IMAGE,
     target_image=TARGET_IMAGE,
     packages_to_install=[f"ultralytics=={ULTRALYTICS_PIP_VERSION}", f"load_dotenv=={LOAD_DOTENV_PIP_VERSION}", 
                          f"numpy=={NUMPY_PIP_VERSION}", f"mlflow=={MLFLOW_PIP_VERSION}", 
-                         f"onnxruntime=={ONNXRUNTIME_PIP_VERSION}", f"onnxslim=={ONNXSLIM_PIP_VERSION}"]
+                         f"onnxruntime=={ONNXRUNTIME_PIP_VERSION}", f"onnxslim=={ONNXSLIM_PIP_VERSION}",
+                         f"botocore=={BOTOCORE_PIP_VERSION}",
+                         f"boto3=={BOTO3_PIP_VERSION}"]
 )
 def train_yolo(
     model_name: str, 
@@ -52,7 +101,6 @@ def train_yolo(
 ):
     import os
     import shutil
-    import time
 
     import torch
     from ultralytics import YOLO, settings
@@ -60,14 +108,27 @@ def train_yolo(
 
     from shared.kubeflow import get_token
         
-    endpoint_url = os.environ.get('AWS_S3_ENDPOINT')
-    region_name = os.environ.get('AWS_DEFAULT_REGION')
-    bucket_name = os.environ.get('AWS_S3_BUCKET')
+    datasets_endpoint_url = os.environ.get('DATASETS_AWS_S3_ENDPOINT')
+    datasets_region_name = os.environ.get('DATASETS_AWS_DEFAULT_REGION')
+    datasets_bucket_name = os.environ.get('DATASETS_AWS_S3_BUCKET')
+    datasets_aws_access_key_id = os.environ.get('DATASETS_AWS_ACCESS_KEY_ID')
+    datasets_aws_secret_access_key = os.environ.get('DATASETS_AWS_SECRET_ACCESS_KEY')
     images_dataset_s3_key = os.environ.get('IMAGES_DATASET_S3_KEY')
 
-    print(f"S3: endpoint_url {endpoint_url}")
-    print(f"S3: bucket_name {bucket_name}")
-    print(f"S3: images_dataset_s3_key {images_dataset_s3_key}")
+    print(f"DATASETS S3: endpoint_url {datasets_endpoint_url}")
+    print(f"DATASETS S3: bucket_name {datasets_bucket_name}")
+    print(f"DATASETS S3: images_dataset_s3_key {images_dataset_s3_key}")
+
+    models_endpoint_url = os.environ.get('MODELS_AWS_S3_ENDPOINT')
+    models_region_name = os.environ.get('MODELS_AWS_DEFAULT_REGION')
+    models_bucket_name = os.environ.get('MODELS_AWS_S3_BUCKET')
+    models_aws_access_key_id = os.environ.get('MODELS_AWS_ACCESS_KEY_ID')
+    models_aws_secret_access_key = os.environ.get('MODELS_AWS_SECRET_ACCESS_KEY')
+    ultralitics_base_models_folder = os.environ.get('ULTRALYTICS_BASE_MODELS_FOLDER')
+
+    print(f"MODELS S3: endpoint_url {datasets_endpoint_url}")
+    print(f"MODELS S3: bucket_name {datasets_bucket_name}")
+    print(f"MODELS S3: images_dataset_s3_key {images_dataset_s3_key}")
 
     print(f"tracking_uri {tracking_uri}")
     print(f"experiment_name {experiment_name}")
@@ -125,11 +186,22 @@ def train_yolo(
     # Reset settings to default values
     settings.reset()
 
+    # Download the base yolo model
+    yolo_model_path = download_yolo_model(endpoint_url=models_endpoint_url, 
+                                          region_name=models_region_name, 
+                                          bucket_name=models_bucket_name,
+                                          base_models_folder=ultralitics_base_models_folder,
+                                          model_file_name=f"{model_name}.pt",
+                                          aws_access_key_id=models_aws_access_key_id, 
+                                          aws_secret_access_key=models_aws_secret_access_key)
+
+    # Check if yolo_model_path exists
+    
     # Load the model
-    model = YOLO(f'{model_name}.pt')
+    model = YOLO(f'{yolo_model_path}')
 
     # Set the run name
-    train_run_name = f"{run_name}-{model_name}-train-{int(time.time())}"
+    train_run_name = f"{run_name}-train"
     print(f"Current run name: {train_run_name}")
 
     # Dataset yaml path
@@ -143,13 +215,17 @@ def train_yolo(
 
     # Start the MLflow run for training
     with mlflow.start_run(run_name=train_run_name) as training_mlrun:
-        mlflow.log_param("dataset_file", f"{endpoint_url}/{bucket_name}/{images_dataset_s3_key}")
+        mlflow.log_param("dataset_file", f"{datasets_endpoint_url}/{datasets_bucket_name}/{images_dataset_s3_key}")
+        mlflow.log_param("model_name", model_name)
         mlflow.log_param("dataset_name", images_dataset_name)
         mlflow.log_param("datasets_root_folder", images_datasets_root_folder)
         mlflow.log_param("dataset_yaml", images_dataset_yaml)
         mlflow.log_param("device", device)
         mlflow.log_param("batch_size", batch_size)
         mlflow.log_param("imgsz", image_size)
+
+        # Create a temporary directory
+        yolo_temp_dir = tempfile.mkdtemp()
 
         print(f"Training model {model_name} with dataset {images_dataset_yaml_path}.")
         results = model.train(
@@ -164,7 +240,8 @@ def train_yolo(
                 conf=confidence_threshold,
                 iou=iou_threshold,
                 label_smoothing=label_smoothing,
-                device=device
+                device=device,
+                project=yolo_temp_dir
             )
         
         metric_value = 0.0
@@ -182,7 +259,7 @@ def train_yolo(
 
         # Save the trained model
         print(f"Saving model to {models_folder}")
-        trained_model_name = f"model-{train_run_name}"
+        trained_model_name = f"{train_run_name}"
         print(f"Trained model name: {trained_model_name}")
         trained_model_pt_path = os.path.join(models_folder, f"{trained_model_name}.pt")
         print(f"Saving model to {trained_model_pt_path}")
@@ -197,8 +274,8 @@ def train_yolo(
         mlflow.end_run()
 
         # Start the MLflow run for validation
-        val_run_name = f"{run_name}-{model_name}-val-{int(time.time())}"
-        print(f"Current run name: {train_run_name}")
+        val_run_name = f"{run_name}-val"
+        print(f"Current run name: {val_run_name}")
         with mlflow.start_run(run_name=val_run_name):
             # Validate the model    
             validation_results = model.val()

@@ -3,6 +3,8 @@
 import json
 import os
 
+from kfp import compiler
+
 from kfp import dsl
 from kfp.dsl import Output, Metrics
 
@@ -16,7 +18,6 @@ from kfp import client as kfp_cli
 
 from shared.experiment_reports import download_experiment_report, load_yaml
 from shared.kubeflow import get_pipeline_id_by_name, get_pipeline, create_experiment, create_run, get_token, get_route_host
-# from utils import get_route_host, get_token, get_pipeline, get_pipeline_id_by_name, download_experiment_report, create_experiment, create_run, load_yaml
 
 NAMESPACE = os.environ.get("NAMESPACE", "default")
 COMPONENT_NAME=os.getenv("COMPONENT_NAME", "train_yolo_optuna")
@@ -277,7 +278,10 @@ def train_yolo_optuna(
     results_output_metrics.log_metric("best_hyperparameters", best_params_json)
 
     # Get the best tuple (experiment_name, run_name)
+    print(f"trial_names={trial_names}")
+    print(f"study.best_trial.number={study.best_trial.number}")
     model_name, model_version  = trial_names[study.best_trial.number]
+    print(f"model_name, model_version = {model_name}, {model_version}")
 
     # Write the best model name and version to the output
     with open(output_model_name, 'w') as f:
@@ -287,4 +291,11 @@ def train_yolo_optuna(
     with open(output_best_model_version, 'w') as f:
         f.write(str(model_version))
 
-    
+if __name__ == "__main__":
+    # Generate and save the component YAML file
+    component_package_path = __file__.replace('.py', '.yaml')
+
+    compiler.Compiler().compile(
+        pipeline_func=train_yolo_optuna,
+        package_path=component_package_path
+    )

@@ -44,8 +44,8 @@ def train_yolo(
     images_datasets_root_folder: str,
     images_dataset_yaml: str,
     models_root_folder: str,
-    metric_value_output: OutputPath(float),
-    model_name_output: OutputPath(str),
+    metric_value_output: OutputPath(float), # type: ignore
+    model_name_output: OutputPath(str), # type: ignore
     results_output_metrics: Output[Metrics]
 ):
     import os
