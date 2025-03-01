@@ -6,7 +6,7 @@ import os
 from kfp import compiler
 
 from kfp import dsl
-from kfp.dsl import Output, Metrics
+from kfp.dsl import Output, Metrics, OutputPath
 
 import os
 import re
@@ -196,8 +196,8 @@ def train_yolo_optuna(
     model_tags: str,
     model_registry_name: str,
     istio_system_namespace: str,
-    output_model_name: Output[str],
-    output_best_model_version: Output[str],
+    output_model_name: OutputPath(str), # type: ignore
+    output_best_model_version: OutputPath(str), # type: ignore
     results_output_metrics: Output[Metrics]
 ):
     experiment_name = f"{experiment_name_prefix}-{int(time.time())}"
