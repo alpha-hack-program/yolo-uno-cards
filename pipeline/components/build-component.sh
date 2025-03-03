@@ -27,8 +27,10 @@ export BASE_IMAGE
 export REGISTRY
 export TAG
 
-# Build the component using the kfp CLI
+# In order for shared folder to be avaible for kfp cli
 export PYTHONPATH=${PYTHONPATH}:$(pwd)/${COMPONENT_NAME}/src:$(pwd)/shared
+
+# Build the component using the kfp CLI
 kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image
 
 # Build the image using the BASE_IMAGE build arg
