@@ -228,11 +228,11 @@ def pipeline(
     train_model_task.set_cpu_limit("6")
     # This need empty_dir_mount which is not available in the current version of the RHOAI pipelines
     # train_model_task.set_accelerator_type("nvidia.com/gpu").set_gpu_limit(1)
-    kubernetes.add_node_selector(
-        train_model_task,
-        label_key='nvidia.com/gpu.product',
-        label_value='NVIDIA-A10G'
-    )
+    # kubernetes.add_node_selector(
+    #     train_model_task,
+    #     label_key='nvidia.com/gpu.product',
+    #     label_value='NVIDIA-A10G'
+    # )
     kubernetes.add_toleration(
         train_model_task,
         key='nvidia.com/gpu',
