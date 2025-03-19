@@ -21,6 +21,17 @@ mlflow
 models
 pipelines
 
+# Upload datasets
+
+Upload these files to s3://minio/<datasets>/datasets
+
+- uno-cards-v1.1.zip
+- uno-cards-v1.2.zip
+
+# Upload yolo model
+
+Upload yolo to s3://minio/<models>/ultralytics
+
 # Refererences
 
 https://learnopencv.com/ultralytics-yolov8/

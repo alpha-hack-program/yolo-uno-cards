@@ -2,6 +2,13 @@ import os
 import tempfile
 
 import boto3
+import shutil
+import torch
+import mlflow
+
+from ultralytics import YOLO, settings
+
+from shared.kubeflow import get_token
 
 from kfp import compiler
 
@@ -98,16 +105,7 @@ def train_yolo(
     metric_value_output: OutputPath(float), # type: ignore
     model_name_output: OutputPath(str), # type: ignore
     results_output_metrics: Output[Metrics]
-):
-    import os
-    import shutil
-
-    import torch
-    from ultralytics import YOLO, settings
-    import mlflow
-
-    from shared.kubeflow import get_token
-        
+):      
     datasets_endpoint_url = os.environ.get('DATASETS_AWS_S3_ENDPOINT')
     datasets_region_name = os.environ.get('DATASETS_AWS_DEFAULT_REGION')
     datasets_bucket_name = os.environ.get('DATASETS_AWS_S3_BUCKET')

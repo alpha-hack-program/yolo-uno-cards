@@ -24,6 +24,7 @@
 #    metric_value_output: float
 #    model_name_output: str
 #    results_output_metrics: system.Metrics
+#    train-yolo-results_output_metrics: system.Metrics
 components:
   comp-train-yolo:
     executorLabel: exec-train-yolo
@@ -99,7 +100,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/train_yolo:v1.0.10
+        image: quay.io/atarazana/train_yolo:v1.0.11
 pipelineInfo:
   name: train-yolo
 root:
@@ -107,6 +108,10 @@ root:
     outputs:
       artifacts:
         results_output_metrics:
+          artifactSelectors:
+          - outputArtifactKey: results_output_metrics
+            producerSubtask: train-yolo
+        train-yolo-results_output_metrics:
           artifactSelectors:
           - outputArtifactKey: results_output_metrics
             producerSubtask: train-yolo
@@ -213,10 +218,14 @@ root:
         artifactType:
           schemaTitle: system.Metrics
           schemaVersion: 0.0.1
+      train-yolo-results_output_metrics:
+        artifactType:
+          schemaTitle: system.Metrics
+          schemaVersion: 0.0.1
     parameters:
       metric_value_output:
         parameterType: NUMBER_DOUBLE
       model_name_output:
         parameterType: STRING
 schemaVersion: 2.1.0
-sdkVersion: kfp-2.10.1
+sdkVersion: kfp-2.8.0
