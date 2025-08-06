@@ -20,6 +20,8 @@ pipelinesServiceAccountName: build-bot-sa
 
 eventListenerServiceAccountName: pipeline
 
+rhoaiModelRegistriesNamespace: rhoai-model-registries
+
 # pipelines:
 #   connection:
 #     name: pipelines
