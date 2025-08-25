@@ -51,7 +51,7 @@ def objective(trial: optuna.Trial,
               owner: str,
               model_tags: str,
               model_registry_name: str,
-              istio_system_namespace: str,
+              model_registry_namespace: str,
               token: str, 
               kfp_endpoint: str):
     # Dynamically define hyperparameter search space
@@ -105,7 +105,7 @@ def objective(trial: optuna.Trial,
     params["owner"] = owner
     params["model_tags"] = model_tags
     params["model_registry_name"] = model_registry_name
-    params["istio_system_namespace"] = istio_system_namespace
+    params["model_registry_namespace"] = model_registry_namespace
     params["model_name"] = model_name
 
     print(f"params: {params}")
@@ -195,7 +195,7 @@ def train_yolo_optuna(
     owner: str,
     model_tags: str,
     model_registry_name: str,
-    istio_system_namespace: str,
+    model_registry_namespace: str,
     output_model_name: OutputPath(str), # type: ignore
     output_best_model_version: OutputPath(str), # type: ignore
     results_output_metrics: Output[Metrics]
@@ -253,7 +253,7 @@ def train_yolo_optuna(
                                            author=author,
                                            owner=owner,
                                            model_registry_name=model_registry_name,
-                                           istio_system_namespace=istio_system_namespace,
+                                           model_registry_namespace=model_registry_namespace,
                                            model_tags=model_tags,
                                            token=token, 
                                            kfp_endpoint=kfp_endpoint), n_trials=n_trials)

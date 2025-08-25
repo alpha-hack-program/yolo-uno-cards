@@ -176,7 +176,7 @@ def pipeline(
     owner: str = "acme",
     model_tags: str = "vision, yolo, uno-cards",
     model_registry_name: str = "model-registry-dev",
-    istio_system_namespace: str = "istio-system"):
+    model_registry_namespace: str = "rhoai-model-registries"):
 
     check_env_task = check_env()
     
@@ -221,7 +221,7 @@ def pipeline(
         owner=owner,
         model_tags=model_tags,
         model_registry_name=model_registry_name,
-        istio_system_namespace=istio_system_namespace
+        model_registry_namespace=model_registry_namespace
     ).set_caching_options(False).after(check_env_task)
 
     # Setting environment variables for train_model_task

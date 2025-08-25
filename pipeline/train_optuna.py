@@ -25,7 +25,7 @@ K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 
 # Load the register model from a url
-REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
+REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/dry/components/register_model/src/component_metadata/register_model.yaml"
 register_model_component = load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
 # Load train_yolo_optuna component
@@ -187,7 +187,7 @@ def pipeline(
     owner: str = "acme",
     model_tags: str = "vision, yolo, uno-cards",
     model_registry_name: str = "model-registry-dev",
-    istio_system_namespace: str = "istio-system"):
+    model_registry_namespace: str = "rhoai-model-registries"):
 
     check_env_task = check_env()
     
@@ -232,13 +232,13 @@ def pipeline(
         owner=owner,
         model_tags=model_tags,
         model_registry_name=model_registry_name,
-        istio_system_namespace=istio_system_namespace
+        model_registry_namespace=model_registry_namespace
     ).set_caching_options(False).after(check_env_task)
 
     # # Register model in production
     # register_model_task = register_model_component(
     #     model_registry_name=model_registry_name,
-    #     istio_system_namespace=istio_system_namespace,
+    #     model_registry_namespace=model_registry_namespace,
     #     model_name=model_name,
     #     model_uri=model_uri,
     #     model_version=model_version,

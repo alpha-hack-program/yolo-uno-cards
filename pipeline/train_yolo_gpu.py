@@ -17,7 +17,7 @@ from kfp.dsl import Input, Output, Metrics, OutputPath
 from kfp.components import load_component_from_file
 
 # Load the register model from a url
-REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/main/components/register_model/src/component_metadata/register_model.yaml"
+REGISTER_MODEL_COMPONENT_URL = "https://raw.githubusercontent.com/alpha-hack-program/model-serving-utils/refs/heads/dry/components/register_model/src/component_metadata/register_model.yaml"
 register_model_component = kfp.components.load_component_from_url(REGISTER_MODEL_COMPONENT_URL)
 
 # Load train_yolo component
@@ -165,7 +165,7 @@ def pipeline(
     owner: str = "acme",
     model_tags: str = "vision, yolo, uno-cards",
     model_registry_name: str = "model-registry-dev",
-    istio_system_namespace: str = "istio-system",
+    model_registry_namespace: str = "rhoai-model-registries",
     force_clean: bool = False):
 
     # Define the root mount path
@@ -279,7 +279,7 @@ def pipeline(
 
     # Prepare the model registry parameters
     model_registry_name = model_registry_name
-    istio_system_namespace = istio_system_namespace
+    model_registry_namespace = model_registry_namespace
     model_name = experiment_name
     model_uri = models_s3_uri
     model_version = run_name
@@ -292,7 +292,7 @@ def pipeline(
     # Register model
     register_model_task = register_model_component(
         model_registry_name=model_registry_name,
-        istio_system_namespace=istio_system_namespace,
+        model_registry_namespace=model_registry_namespace,
         model_name=model_name,
         model_uri=model_uri,
         model_version=model_version,

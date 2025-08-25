@@ -247,9 +247,9 @@ def train_yolo(
             results_output_metrics.log_metric("training/map", results.box.map if results.box.map is not None else 0.0)
             results_output_metrics.log_metric("training/map50", results.box.map50 if results.box.map50 is not None else 0.0)
             results_output_metrics.log_metric("training/map75", results.box.map75 if results.box.map75 is not None else 0.0)
-            results_output_metrics.log_metric("training/mp", results.box.mp if results.box.mp is not None else 0.0)
-            results_output_metrics.log_metric("training/mr", results.box.mr if results.box.mr is not None else 0.0)
-            results_output_metrics.log_metric("training/nc", results.box.nc if results.box.nc is not None else 0.0)
+            # results_output_metrics.log_metric("training/mp", results.box.mp if results.box.mp is not None else 0.0)
+            # results_output_metrics.log_metric("training/mr", results.box.mr if results.box.mr is not None else 0.0)
+            # results_output_metrics.log_metric("training/nc", results.box.nc if results.box.nc is not None else 0.0)
 
             metric_value = results.box.map
         else:
@@ -283,15 +283,15 @@ def train_yolo(
                 mlflow.log_metric("val/map", validation_results.box.map)
                 mlflow.log_metric("val/map50", validation_results.box.map50)
                 mlflow.log_metric("val/map75", validation_results.box.map75)
-                mlflow.log_metric("val/mp", validation_results.box.mp)
-                mlflow.log_metric("val/mr", validation_results.box.mr)
-                mlflow.log_metric("val/nc", validation_results.box.nc)
+                # mlflow.log_metric("val/mp", validation_results.box.mp)
+                # mlflow.log_metric("val/mr", validation_results.box.mr)
+                # mlflow.log_metric("val/nc", validation_results.box.nc)
                 results_output_metrics.log_metric("val/map", validation_results.box.map)
                 results_output_metrics.log_metric("val/map50", validation_results.box.map50)
                 results_output_metrics.log_metric("val/map75", validation_results.box.map75)
-                results_output_metrics.log_metric("val/mp", validation_results.box.mp)
-                results_output_metrics.log_metric("val/mr", validation_results.box.mr)
-                results_output_metrics.log_metric("val/nc", validation_results.box.nc)
+                # results_output_metrics.log_metric("val/mp", validation_results.box.mp)
+                # results_output_metrics.log_metric("val/mr", validation_results.box.mr)
+                # results_output_metrics.log_metric("val/nc", validation_results.box.nc)
             else:
                 print("No box attribute in the results!!!")
             

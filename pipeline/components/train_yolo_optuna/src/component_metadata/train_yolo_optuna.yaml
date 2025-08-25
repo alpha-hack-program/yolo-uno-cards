@@ -8,9 +8,9 @@
 #    images_dataset_pvc_size_in_gi: int
 #    images_dataset_yaml: str
 #    images_datasets_root_folder: str
-#    istio_system_namespace: str
 #    model_name: str
 #    model_registry_name: str
+#    model_registry_namespace: str
 #    model_tags: str
 #    models_root_folder: str
 #    n_trials: int
@@ -41,11 +41,11 @@ components:
           parameterType: STRING
         images_datasets_root_folder:
           parameterType: STRING
-        istio_system_namespace:
-          parameterType: STRING
         model_name:
           parameterType: STRING
         model_registry_name:
+          parameterType: STRING
+        model_registry_namespace:
           parameterType: STRING
         model_tags:
           parameterType: STRING
@@ -90,7 +90,7 @@ deploymentSpec:
         - python3
         - -m
         - kfp.dsl.executor_main
-        image: quay.io/atarazana/train_yolo_optuna:v1.0.4
+        image: quay.io/atarazana/train_yolo_optuna:v1.0.5
 pipelineInfo:
   name: train-yolo-optuna
 root:
@@ -136,12 +136,12 @@ root:
               componentInputParameter: images_dataset_yaml
             images_datasets_root_folder:
               componentInputParameter: images_datasets_root_folder
-            istio_system_namespace:
-              componentInputParameter: istio_system_namespace
             model_name:
               componentInputParameter: model_name
             model_registry_name:
               componentInputParameter: model_registry_name
+            model_registry_namespace:
+              componentInputParameter: model_registry_namespace
             model_tags:
               componentInputParameter: model_tags
             models_root_folder:
@@ -172,11 +172,11 @@ root:
         parameterType: STRING
       images_datasets_root_folder:
         parameterType: STRING
-      istio_system_namespace:
-        parameterType: STRING
       model_name:
         parameterType: STRING
       model_registry_name:
+        parameterType: STRING
+      model_registry_namespace:
         parameterType: STRING
       model_tags:
         parameterType: STRING
