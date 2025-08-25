@@ -18,7 +18,7 @@ spec:
             - -ec
             - |-
               echo -n 'Creating PipelineRun to create the first version of the KFP pipeline {{ .Values.kfpUpsertTektonPipelineName }}'
-              while ! oc get pipeline {{ .Values.kfpUpsertTektonPipelineName }} 2>/dev/null; do
+              while ! oc get pipelines.tekton.dev {{ .Values.kfpUpsertTektonPipelineName }} 2>/dev/null; do
                 echo -n .
                 sleep 5
               done; echo
