@@ -12,6 +12,11 @@ argocdNamespace: openshift-gitops
 dataScienceProjectNamespace: yolo
 dataScienceProjectDisplayName: yolo
 
+modelRegistriesApplication:
+  path: gitops/model-registry
+  targetRevision: dry # TODO: This has to be 'main' but GENEVA depends on model-serving-utils
+  repoURL: https://github.com/alpha-hack-program/model-serving-utils.git
+
 modelRegistries:
   - name: model-registry-dev
     databaseName: metadb

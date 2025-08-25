@@ -39,9 +39,9 @@ spec:
     server: 'https://kubernetes.default.svc'
     namespace: {{ $.Values.dataScienceProjectNamespace }}  # Project's Namespace
   source:
-    path: gitops/model-registry
-    repoURL: https://github.com/alpha-hack-program/model-serving-utils.git
-    targetRevision: main
+    path: {{ $.Values.modelRegistriesApplication.path }}
+    repoURL: {{ $.Values.modelRegistriesApplication.repoURL | default "http://ddd" }}
+    targetRevision: {{ $.Values.modelRegistriesApplication.targetRevision | default "main" }}
     helm:
       values: |
         registry:
