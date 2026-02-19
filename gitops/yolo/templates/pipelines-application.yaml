@@ -7,7 +7,7 @@ spec:
   project: default
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: {{ .Values.argocdNamespace }}
+    namespace: {{ .Values.dataScienceProjectNamespace }}
   source:
     path: gitops/pipelines
     repoURL: {{ .Values.vcs.uri }}
