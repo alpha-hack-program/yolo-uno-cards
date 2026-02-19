@@ -7,7 +7,7 @@ spec:
   project: default
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: {{ .Values.argocdNamespace }}
+    namespace: {{ .Values.dataScienceProjectNamespace }}
   source:
     path: gitops/pipelines
     repoURL: {{ .Values.vcs.uri }}
@@ -28,18 +28,33 @@ spec:
           value: "{{ .Values.dataScienceProjectNamespace }}"
         - name: dataScienceProjectDisplayName
           value: "{{ .Values.dataScienceProjectDisplayName }}"
+        - name: partOf
+          value: "{{ .Values.instanceName }}"
         - name: mountCaCerts
           value: "{{ .Values.mountCaCerts }}"
         - name: pipelinesServiceAccountName
           value: "{{ .Values.pipelinesServiceAccountName }}"
+        # New pipelines configuration format
+        - name: pipelines.enabled
+          value: "true"
         - name: pipelines.connection.name
           value: "{{ .Values.pipelines.connection.name }}"
         - name: pipelines.connection.displayName
           value: "{{ .Values.pipelines.connection.displayName }}"
+        - name: pipelines.connection.description
+          value: "{{ .Values.pipelines.connection.description }}"
         - name: pipelines.connection.type
           value: "{{ .Values.pipelines.connection.type }}"
+        - name: pipelines.connection.typeProtocol
+          value: "{{ .Values.pipelines.connection.typeProtocol }}"
+        - name: pipelines.connection.typeRef
+          value: "{{ .Values.pipelines.connection.typeRef }}"
         - name: pipelines.connection.scheme
           value: "{{ .Values.pipelines.connection.scheme }}"
+        - name: pipelines.connection.host
+          value: "{{ .Values.pipelines.connection.host }}"
+        - name: pipelines.connection.port
+          value: "{{ .Values.pipelines.connection.port }}"
         - name: pipelines.connection.awsAccessKeyId
           value: "{{ .Values.pipelines.connection.awsAccessKeyId }}"
         - name: pipelines.connection.awsSecretAccessKey
@@ -48,9 +63,7 @@ spec:
           value: "{{ .Values.pipelines.connection.awsDefaultRegion }}"
         - name: pipelines.connection.awsS3Bucket
           value: "{{ .Values.pipelines.connection.awsS3Bucket }}"
-        - name: pipelines.connection.awsS3Endpoint
-          value: "{{ .Values.pipelines.connection.awsS3Endpoint }}"
-
+        # S3 job configuration
         - name: s3.connection.awsAccessKeyId
           value: "{{ .Values.s3.connection.awsAccessKeyId }}"
         - name: s3.connection.awsSecretAccessKey

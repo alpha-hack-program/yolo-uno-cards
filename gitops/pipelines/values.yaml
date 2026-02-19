@@ -40,10 +40,22 @@ pipelines:
     awsDefaultRegion: none
     awsS3Bucket: pipelines
 
+# S3 configuration for the s3-job.yaml template
+s3:
+  config:
+    awsS3BucketList: pipelines,models,datasets
+  connection:
+    awsAccessKeyId: minio
+    awsSecretAccessKey: minio123
+    awsS3Endpoint: http://minio.ic-shared-minio.svc:9000
+
 pythonImage:
   version: "3.9"
   name: "python"
   tag: "3.9-ubi8"
+
+images:
+  python3: "registry.redhat.io/ubi8/python-39:1-158"
 
 mountCaCerts: "false"
 
