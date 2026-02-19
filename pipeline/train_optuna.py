@@ -20,7 +20,7 @@ MODELS_CONNECTION_SECRET = "aws-connection-models"
 
 BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
 
-KFP_PIP_VERSION="2.8.0"
+KFP_PIP_VERSION="2.13.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 
@@ -353,7 +353,8 @@ if __name__ == '__main__':
         kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
 
     # Pipeline name
-    pipeline_name = os.path.basename(__file__).replace('.py', '')
+    pipeline_name = os.path.basename(__file__).replace(".py", "").replace("_", "-")
+
 
     # If both kfp_endpoint and token are provided, upload the pipeline
     if kfp_endpoint and token:

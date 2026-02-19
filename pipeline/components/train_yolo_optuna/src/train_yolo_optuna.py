@@ -26,7 +26,7 @@ REGISTRY=os.environ.get("REGISTRY", f"image-registry.openshift-image-registry.sv
 TAG=os.environ.get("TAG", f"latest")
 TARGET_IMAGE=f"{REGISTRY}/{COMPONENT_NAME}:{TAG}"
 
-KFP_PIP_VERSION="2.8.0"
+KFP_PIP_VERSION="2.13.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 LOAD_DOTENV_PIP_VERSION="0.1.0"

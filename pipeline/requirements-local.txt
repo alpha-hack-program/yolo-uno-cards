@@ -1,4 +1,4 @@
-kfp[kubernetes]==2.8.0
+kfp[kubernetes]==2.13.0
 boto3
 botocore
 kubernetes==23.6.0

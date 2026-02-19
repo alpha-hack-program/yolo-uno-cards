@@ -122,7 +122,7 @@ if __name__ == '__main__':
         kfp_endpoint = get_route_host(route_name="ds-pipeline-dspa")
 
     # Pipeline name
-    pipeline_name = os.path.basename(__file__).replace('.py', '')
+    pipeline_name = os.path.basename(__file__).replace(".py", "").replace("_", "-")
 
     # If both kfp_endpoint and token are provided, upload the pipeline
     if kfp_endpoint and token:

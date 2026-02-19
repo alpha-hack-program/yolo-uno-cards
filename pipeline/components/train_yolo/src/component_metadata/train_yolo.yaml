@@ -228,4 +228,4 @@ root:
       model_name_output:
         parameterType: STRING
 schemaVersion: 2.1.0
-sdkVersion: kfp-2.8.0
+sdkVersion: kfp-2.13.0

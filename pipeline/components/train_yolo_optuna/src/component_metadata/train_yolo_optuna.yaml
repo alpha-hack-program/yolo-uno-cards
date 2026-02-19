@@ -85,7 +85,7 @@ deploymentSpec:
         - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
           \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
           \ python3 -m pip install --quiet --no-warn-script-location 'load_dotenv==0.1.0'\
-          \ 'optuna==4.1.0' 'kfp[kubernetes]==2.8.0' 'kubernetes==23.6.0' && \"$0\"\
+          \ 'optuna==4.1.0' 'kfp[kubernetes]==2.13.0' 'kubernetes==23.6.0' && \"$0\"\
           \ \"$@\"\n"
         - python3
         - -m
@@ -206,4 +206,4 @@ root:
       output_model_name:
         parameterType: STRING
 schemaVersion: 2.1.0
-sdkVersion: kfp-2.8.0
+sdkVersion: kfp-2.13.0

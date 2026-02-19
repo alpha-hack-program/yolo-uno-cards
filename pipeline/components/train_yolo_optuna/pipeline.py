@@ -16,7 +16,7 @@ MODELS_CONNECTION_SECRET = "aws-connection-models"
 
 BASE_IMAGE="quay.io/modh/runtime-images:runtime-pytorch-ubi9-python-3.9-20241111"
 
-KFP_PIP_VERSION="2.8.0"
+KFP_PIP_VERSION="2.13.0"
 K8S_PIP_VERSION="23.6.0"
 OPTUNA_PIP_VERSION="4.1.0"
 LOAD_DOTENV_PIP_VERSION="0.1.0"
