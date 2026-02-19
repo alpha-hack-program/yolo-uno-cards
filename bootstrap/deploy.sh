@@ -91,9 +91,21 @@ spec:
         - name: pipelines.connection.name
           value: "pipelines"
         - name: pipelines.connection.displayName
-          value: "pipelines"
+          value: "Pipelines S3 Storage"
+        - name: pipelines.connection.description
+          value: "S3-compatible storage connection for ML pipelines"
         - name: pipelines.connection.type
           value: "s3"
+        - name: pipelines.connection.typeProtocol
+          value: "s3"
+        - name: pipelines.connection.typeRef
+          value: "s3"
+        - name: pipelines.connection.scheme
+          value: "${S3_SCHEME}"
+        - name: pipelines.connection.host
+          value: "${S3_ENDPOINT%:*}"
+        - name: pipelines.connection.port
+          value: "${S3_ENDPOINT#*:}"
         - name: pipelines.connection.awsAccessKeyId
           value: "${PIPELINES_ACCESS_KEY}"
         - name: pipelines.connection.awsSecretAccessKey
@@ -102,10 +114,6 @@ spec:
           value: "none"
         - name: pipelines.connection.awsS3Bucket
           value: "${PIPELINES_BUCKET_NAME}"
-        - name: pipelines.connection.scheme
-          value: "${S3_SCHEME}"
-        - name: pipelines.connection.awsS3Endpoint
-          value: "${S3_ENDPOINT}"
 
         - name: datasets.connection.name
           value: "datasets"
