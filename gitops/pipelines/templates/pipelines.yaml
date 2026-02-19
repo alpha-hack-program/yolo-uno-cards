@@ -1,0 +1,161 @@
+# if there is a section called pipelines and it's enabled, and there is a connection section with awsAccessKeyIdSecret and awsSecretAccessKeySecret, then create a secret with the awsAccessKeyId and awsSecretAccessKey
+
+{{ $pipelines := .Values.pipelines }}
+{{ if $pipelines.enabled }}
+# Fail if there is no connection section containing everything needed
+{{- if not $pipelines.connection.name }}
+{{- fail "pipelines.connection.name is required" }}
+{{- end }}
+{{- if not $pipelines.connection.type }}
+{{- fail "pipelines.connection.type is required" }}
+{{- end }}
+{{- if not $pipelines.connection.typeProtocol }}
+{{- fail "pipelines.connection.typeProtocol is required" }}
+{{- end }}
+{{- if not $pipelines.connection.typeRef }}
+{{- fail "pipelines.connection.typeRef is required" }}
+{{- end }}
+{{- if not $pipelines.connection.displayName }}
+{{- fail "pipelines.connection.displayName is required" }}
+{{- end }}
+{{- if not $pipelines.connection.awsAccessKeyId }}
+{{- fail "pipelines.connection.awsAccessKeyId is required" }}
+{{- end }}
+{{- if not $pipelines.connection.awsSecretAccessKey }}
+{{- fail "pipelines.connection.awsSecretAccessKey is required" }}
+{{- end }}
+{{- if not $pipelines.connection.awsDefaultRegion }}
+{{- fail "pipelines.connection.awsDefaultRegion is required" }}
+{{- end }}
+{{- if not $pipelines.connection.awsS3Bucket }}
+{{- fail "pipelines.connection.awsS3Bucket is required" }}
+{{- end }}
+{{- if not $pipelines.connection.host }}
+{{- fail "pipelines.connection.host is required" }}
+{{- end }}
+{{- if not $pipelines.connection.port }}
+{{- fail "pipelines.connection.port is required" }}
+{{- end }}
+{{- if not $pipelines.connection.scheme }}
+{{- fail "pipelines.connection.scheme is required" }}
+{{- end }}
+
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: dashboard-dspa-secret
+  labels:
+    opendatahub.io/dashboard: 'true'
+stringData:
+  AWS_ACCESS_KEY_ID: {{ .Values.pipelines.connection.awsAccessKeyId }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.pipelines.connection.awsSecretAccessKey }}
+type: Opaque
+
+---
+kind: Secret
+apiVersion: v1
+metadata:
+  name: {{ .Values.pipelines.connection.name }}
+  labels:
+    opendatahub.io/dashboard: 'true'
+    opendatahub.io/managed: 'true'
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+  annotations:
+    opendatahub.io/connection-type: {{ .Values.pipelines.connection.type }}
+    opendatahub.io/connection-type-protocol: {{ .Values.pipelines.connection.typeProtocol }}
+    opendatahub.io/connection-type-ref: {{ .Values.pipelines.connection.typeRef }}
+    openshift.io/display-name: {{ .Values.pipelines.connection.displayName }}
+    openshift.io/description: '{{ .Values.pipelines.connection.description }}'
+    openshift.io/display-name: {{ .Values.pipelines.connection.displayName }}
+stringData:
+  AWS_ACCESS_KEY_ID: {{ .Values.pipelines.connection.awsAccessKeyId }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.pipelines.connection.awsSecretAccessKey }}
+  AWS_DEFAULT_REGION: {{ .Values.pipelines.connection.awsDefaultRegion }}
+  AWS_S3_BUCKET: {{ .Values.pipelines.connection.awsS3Bucket }}
+  AWS_S3_ENDPOINT: {{ printf "%s://%s:%s" .Values.pipelines.connection.scheme .Values.pipelines.connection.host .Values.pipelines.connection.port }}
+  
+type: Opaque
+---
+apiVersion: datasciencepipelinesapplications.opendatahub.io/v1
+kind: DataSciencePipelinesApplication
+metadata:
+  name: dspa
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+spec:
+  apiServer:
+    caBundleFileMountPath: ''
+    caBundleFileName: ''
+    deploy: true
+    artifactSignedURLExpirySeconds: 60
+    enableSamplePipeline: false
+    managedPipelines: {}
+    enableOauth: true
+    cacheEnabled: true
+    pipelineStore: kubernetes
+  database:
+    disableHealthCheck: false
+    mariaDB:
+      deploy: true
+      pipelineDBName: mlpipeline
+      pvcSize: 10Gi
+      username: mlpipeline
+  dspVersion: v2
+  objectStorage:
+    disableHealthCheck: false
+    enableExternalRoute: false
+    externalStorage:
+      basePath: ''
+      bucket: {{ .Values.pipelines.connection.awsS3Bucket }}
+      host: {{ .Values.pipelines.connection.host }}
+      port: '{{ .Values.pipelines.connection.port }}'
+      region: {{ .Values.pipelines.connection.awsDefaultRegion }}
+      s3CredentialsSecret:
+        accessKey: AWS_ACCESS_KEY_ID
+        secretKey: AWS_SECRET_ACCESS_KEY
+        secretName: dashboard-dspa-secret
+      scheme: {{ .Values.pipelines.connection.scheme }}
+  persistenceAgent:
+    deploy: true
+    numWorkers: 2
+  podToPodTLS: true
+  scheduledWorkflow:
+    cronScheduleTimezone: UTC
+    deploy: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-configmap-access
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-configmap-access
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workflow-configmap-access
+subjects:
+- kind: ServiceAccount
+  name: ds-pipeline-workflow-controller-dspa
+{{- end }}

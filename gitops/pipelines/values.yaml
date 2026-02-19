@@ -9,6 +9,7 @@ dataScienceProjectDisplayName: yolo
 dataScienceProjectNamespace: yolo
 
 instanceName: yolo
+partOf: yolo
 
 createNamespace: true
 
@@ -22,17 +23,22 @@ eventListenerServiceAccountName: pipeline
 
 rhoaiModelRegistriesNamespace: rhoai-model-registries
 
-# pipelines:
-#   connection:
-#     name: pipelines
-#     displayName: pipelines
-#     type: s3
-#     scheme: http
-#     awsAccessKeyId: minio
-#     awsSecretAccessKey: minio123
-#     awsDefaultRegion: none
-#     awsS3Bucket: pipelines
-#     awsS3Endpoint: minio.ic-shared-minio.svc:9000
+pipelines:
+  enabled: true
+  connection:
+    name: pipelines
+    displayName: Pipelines S3 Storage
+    description: S3-compatible storage connection for ML pipelines
+    type: s3
+    typeProtocol: s3
+    typeRef: s3
+    scheme: http
+    host: minio.ic-shared-minio.svc
+    port: "9000"
+    awsAccessKeyId: minio
+    awsSecretAccessKey: minio123
+    awsDefaultRegion: none
+    awsS3Bucket: pipelines
 
 pythonImage:
   version: "3.9"
