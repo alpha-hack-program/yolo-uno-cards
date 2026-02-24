@@ -3,10 +3,6 @@ import tempfile
 
 import boto3
 import shutil
-import torch
-import mlflow
-
-from ultralytics import YOLO, settings
 
 from shared.kubeflow import get_token
 
@@ -167,6 +163,11 @@ def train_yolo(
 
     # Get the kubernetes token in a string
     os.environ["MLFLOW_TRACKING_TOKEN"] = get_token()
+
+    # Import runtime dependencies (deferred to avoid requiring them during KFP component build)
+    import torch
+    import mlflow
+    from ultralytics import YOLO, settings
 
     # Update a setting
     settings.update({"mlflow": True})

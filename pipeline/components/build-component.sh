@@ -25,11 +25,11 @@ export BASE_IMAGE
 export REGISTRY
 export TAG
 
-# In order for shared folder to be avaible for kfp cli
-export PYTHONPATH=${PYTHONPATH}:$(pwd)/${COMPONENT_NAME}/src:$(pwd)/shared
+# In order for shared folder to be available for kfp cli (parent of shared/ must be in path)
+export PYTHONPATH=${PYTHONPATH}:$(pwd):$(pwd)/${COMPONENT_NAME}/src
 
-# Build the component using the kfp CLI
-kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image
+# Build the component using the kfp CLI (via uv to use project dependencies)
+uv run kfp component build ${COMPONENT_NAME}/src/ --component-filepattern ${COMPONENT_NAME}.py --no-push-image --no-build-image
 
 # Build the image using the BASE_IMAGE build arg
 podman build -t ${COMPONENT_NAME}:${TAG} -f ./Containerfile . \
