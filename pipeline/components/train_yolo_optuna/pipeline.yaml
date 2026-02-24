@@ -33,7 +33,7 @@
 #    optimizer_bounds: str [Default: 'Adam']
 #    optimizer_type: str [Default: 'categorical']
 #    owner: str [Default: 'acme']
-#    pipeline_name: str [Default: 'train_yolo']
+#    pipeline_name: str [Default: 'train-yolo']
 #    weight_decay_bounds: str [Default: '0.0005, 0.001']
 #    weight_decay_type: str [Default: 'float']
 # Outputs:
@@ -504,7 +504,7 @@ root:
         isOptional: true
         parameterType: STRING
       pipeline_name:
-        defaultValue: train_yolo
+        defaultValue: train-yolo
         isOptional: true
         parameterType: STRING
       weight_decay_bounds:

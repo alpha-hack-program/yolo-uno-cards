@@ -176,7 +176,7 @@ def pipeline(
     label_smoothing_bounds: str = "0.07, 0.2",
     batch_size_type: str = "categorical",             # float, categorical uniform
     batch_size_bounds: str = "8, 16, 32",
-    pipeline_name: str = 'train_yolo',
+    pipeline_name: str = 'train-yolo',
     images_dataset_name: str = "uno-cards-v1.2",
     images_datasets_root_folder: str = "datasets",
     images_dataset_yaml: str = "data.yaml",
