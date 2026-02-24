@@ -16,16 +16,25 @@ modelRegistriesApplication:
   path: gitops/model-registry
   targetRevision: dry # TODO: This has to be 'main' but GENEVA depends on model-serving-utils
   repoURL: https://github.com/alpha-hack-program/model-serving-utils.git
+  registry:
+    namespace: rhoai-model-registries
+    rest:
+      port: 8080
+      serviceRoute: disabled
+    grpc:
+      port: 9090
 
 modelRegistries:
   - name: model-registry-dev
     databaseName: metadb
     databaseUser: root
     databasePassword: test
+    serviceRoute: enabled
   - name: model-registry-pro
     databaseName: metadb
     databaseUser: root
     databasePassword: test
+    serviceRoute: enabled
 
 istioSystemNamespace: istio-system
 

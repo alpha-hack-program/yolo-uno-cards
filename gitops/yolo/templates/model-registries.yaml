@@ -1,35 +1,10 @@
-# ---
-# apiVersion: rbac.authorization.k8s.io/v1
-# kind: Role
-# metadata:
-#   name: route-access
-#   namespace: {{ .Values.istioSystemNamespace }}          # Target namespace
-# rules:
-# - apiGroups: ["route.openshift.io"]
-#   resources: ["routes"]
-#   verbs: ["list", "watch"]
-# ---
-# apiVersion: rbac.authorization.k8s.io/v1
-# kind: RoleBinding
-# metadata:
-#   name: route-access-binding
-#   namespace: {{ .Values.istioSystemNamespace }}          # Target namespace
-# subjects:
-# - kind: ServiceAccount
-#   name: pipeline-runner-dspa                             # Service account name
-#   namespace: {{ .Values.dataScienceProjectNamespace }}   # Project's Namespace
-# roleRef:
-#   kind: Role
-#   name: route-access                                     # Name of the Role created earlier
-#   apiGroup: rbac.authorization.k8s.io
-# For each model registry, create a new Application resource
 {{- range .Values.modelRegistries }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .name }}
-  namespace: {{ $.Values.argocdNamespace }}                # ArgoCD namespace
+  namespace: {{ $.Values.argocdNamespace }}
   annotations:
     argocd.argoproj.io/compare-options: IgnoreExtraneous
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
@@ -37,21 +12,82 @@ spec:
   project: default
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: {{ $.Values.dataScienceProjectNamespace }}  # Project's Namespace
+    namespace: {{ $.Values.modelRegistriesApplication.registry.namespace | default "rhoai-model-registries" }}
   source:
     path: {{ $.Values.modelRegistriesApplication.path }}
-    repoURL: {{ $.Values.modelRegistriesApplication.repoURL | default "http://ddd" }}
+    repoURL: {{ $.Values.modelRegistriesApplication.repoURL }}
     targetRevision: {{ $.Values.modelRegistriesApplication.targetRevision | default "main" }}
     helm:
       values: |
         registry:
-          name: {{ .name }}
+          namespace: {{ $.Values.modelRegistriesApplication.registry.namespace | default "rhoai-model-registries" }}
+          grpc:
+            port: {{ $.Values.modelRegistriesApplication.registry.grpc.port | default 9090 }}
+            {{- with $.Values.modelRegistriesApplication.registry.grpc.image }}
+            image: {{ . }}
+            {{- end }}
+            {{- with $.Values.modelRegistriesApplication.registry.grpc.resources }}
+            resources:
+              limits:
+                cpu: {{ .limits.cpu | default "100m" }}
+                memory: {{ .limits.memory | default "256Mi" }}
+              requests:
+                cpu: {{ .requests.cpu | default "100m" }}
+                memory: {{ .requests.memory | default "256Mi" }}
+            {{- end }}
+          rest:
+            port: {{ $.Values.modelRegistriesApplication.registry.rest.port | default 8080 }}
+            serviceRoute: {{ .serviceRoute | default $.Values.modelRegistriesApplication.registry.rest.serviceRoute | default "disabled" }}
+            {{- with $.Values.modelRegistriesApplication.registry.rest.image }}
+            image: {{ . }}
+            {{- end }}
+            {{- with $.Values.modelRegistriesApplication.registry.rest.resources }}
+            resources:
+              limits:
+                cpu: {{ .limits.cpu | default "100m" }}
+                memory: {{ .limits.memory | default "256Mi" }}
+              requests:
+                cpu: {{ .requests.cpu | default "100m" }}
+                memory: {{ .requests.memory | default "256Mi" }}
+            {{- end }}
+        {{- with $.Values.modelRegistriesApplication.pvc }}
+        pvc:
+          {{- with .metadataMysql }}
+          metadataMysql:
+            storageRequest: {{ .storageRequest | default "10Gi" }}
+          {{- end }}
+        {{- end }}
+        {{- with $.Values.modelRegistriesApplication.registryDb }}
         registryDb:
-          databaseName: {{ .databaseName }}
-          databaseUser: {{ .databaseUser }}
-          databasePassword: {{ .databasePassword }}
+          {{- with .allowEmptyPassword }}
+          allowEmptyPassword: {{ . | quote }}
+          {{- end }}
+          {{- with .dbContainer }}
+          dbContainer:
+            {{- with .image }}
+            image:
+              repository: {{ .repository | default "mysql" }}
+              tag: {{ .tag | default "8.0.3" | quote }}
+            {{- end }}
+            {{- with .imagePullPolicy }}
+            imagePullPolicy: {{ . }}
+            {{- end }}
+          {{- end }}
+          {{- with .replicas }}
+          replicas: {{ . }}
+          {{- end }}
+          {{- with .revisionHistoryLimit }}
+          revisionHistoryLimit: {{ . }}
+          {{- end }}
+          {{- with .strategy }}
+          strategy:
+            type: {{ .type | default "Recreate" }}
+          {{- end }}
+          {{- with .type }}
+          type: {{ . }}
+          {{- end }}
+        {{- end }}
   syncPolicy:
     automated:
-      # prune: true
       selfHeal: true
 {{- end }}
