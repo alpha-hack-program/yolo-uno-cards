@@ -159,8 +159,9 @@ subjects:
 - kind: ServiceAccount
   name: ds-pipeline-workflow-controller-dspa
 ---
-# Grant pipeline-runner-dspa permission to access DSPA API (healthz endpoint)
+# Grant pipeline-runner-dspa permission to access DSPA API
 # Required when KFP client in pipeline components connects to the DSPA API
+# (healthz, create experiment, create run, get run, etc.)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -173,7 +174,7 @@ metadata:
 rules:
 - apiGroups: ["datasciencepipelinesapplications.opendatahub.io"]
   resources: ["datasciencepipelinesapplications/api"]
-  verbs: ["get"]
+  verbs: ["get", "create", "list", "update", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
