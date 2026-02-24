@@ -50,6 +50,10 @@ spec:
                 cpu: {{ .requests.cpu | default "100m" }}
                 memory: {{ .requests.memory | default "256Mi" }}
             {{- end }}
+        registryDb:
+          databaseName: {{ .databaseName | default "metadb" }}
+          databaseUser: {{ .databaseUser | default "root" }}
+          databasePassword: {{ .databasePassword }}
         {{- with $.Values.modelRegistriesApplication.pvc }}
         pvc:
           {{- with .metadataMysql }}
